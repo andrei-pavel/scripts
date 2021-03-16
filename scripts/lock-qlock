@@ -1,0 +1,28 @@
+#!/bin/bash
+
+# Copyright (C) 2017-2021 Andrei Pavel, andrei.pavel@mail.com
+# Licensed under the MIT License
+
+# Header
+SCRIPT_PATH="$(dirname "$(readlink -f "${0}")")"
+. "${SCRIPT_PATH}/lib/header"
+
+parse-parameters "${@}"
+set -- "${EXTRA_PARAMETERS[@]}"
+
+#------------------------------------------------------------------------------#
+
+json='
+{
+  "action": "lock",
+  "user": "t@t.com",
+  "token": "yomama",
+  "uuid": "C001BABEB16B00B55EC52B7E151628AE",
+  "major": 257,
+  "minor": 264
+}
+'
+
+curl -X 'POST' 'qlock-eac:24261/door' -H 'Content-Type: application/json' -d "${json}"
+
+printf '\n'

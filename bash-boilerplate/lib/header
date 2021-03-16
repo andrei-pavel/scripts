@@ -1,0 +1,280 @@
+#!/bin/bash
+
+# Copyright (C) 2017-2021 Andrei Pavel, andrei.pavel@mail.com
+# Licensed under the MIT License
+
+# Fail script if any command fails.
+set -euo pipefail
+
+# Extended globbing is required for pattern matching in parameters with multiple
+# patterns.
+shopt -s extglob
+
+# Print usage function
+function print-usage() {
+  local arguments=
+  if test -z "${ARGUMENTS+x}"; then
+    ARGUMENTS="
+"
+  else
+    arguments="{{arguments}}"
+    ARGUMENTS="
+Arguments:
+${ARGUMENTS}"
+  fi
+  printf \
+'Usage: %s {{options}} %s
+Options:
+  [-c|--config $config_yaml]                                    Read from a YAML configuration and convert all
+                                                                key-value pairs to environment variables.
+  [-d|--debug]                                                  Enable debug mode, showing every executed command.
+  [-h|--help]                                                   Print usage (this text).%s%s' \
+    "$(basename "${0}")" "${arguments}" "${ARGUMENTS}" "${_add_to_usage-}"
+}
+
+SCRIPT_PATH="$(dirname "$(readlink -f "${0}")")"
+if test -z "${BASH_SOURCE+x}"; then
+  LIB_PATH="${SCRIPT_PATH}"
+else
+  LIB_PATH="$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")"
+fi
+
+# Colors
+if test -t 1; then
+  RESET='\033[0m'
+  BLACK='\033[30m'
+  RED='\033[31m'
+  GREEN='\033[32m'
+  YELLOW='\033[33m'
+  BLUE='\033[34m'
+  PURPLE='\033[35m'
+  CYAN='\033[36m'
+  WHITE='\033[37m'
+else
+  RESET=
+  BLACK=
+  RED=
+  GREEN=
+  YELLOW=
+  BLUE=
+  PURPLE=
+  CYAN=
+  WHITE=
+fi
+
+# Reset variables responsible for argument defining & parameter parsing.
+export _simple_argument_variables=''
+export _simple_argument_parameters=''
+export _simple_argument_descriptions=''
+export _valued_argument_variables=''
+export _valued_argument_parameters=''
+export _valued_argument_descriptions=''
+export _positional_argument_variables=''
+export _positional_argument_descriptions=''
+
+# Parse arguments.
+# Source guard
+test -n "${_LIB_HEADER_SOURCED+x}" && return 0
+export _LIB_HEADER_SOURCED=true
+
+# Print -d and -h if they were given as arguments. Use this when running another
+# script inside your script to which you want to pass the same arguments that
+# were given to the parent script: ./script $(additional-options)
+function additional-options() {
+  printf '%s' "${_ADDITIONAL_OPTIONS-}"
+}
+
+# Print any given arguments other than default options. Use this when running
+# another script inside your script to which you want to pass the same arguments
+# that were given to the parent script: ./script $(additional-parameters)
+function additional-parameters() {
+  printf '%s' "${_ADDITIONAL_PARAMETERS-}"
+}
+
+# Define an argument.
+function argument() {
+  local mode=${1}
+  local variable=${2}
+  local parameter_or_description=${3}
+  local description=${4-}
+  local length
+  local first_column
+  case "${mode}" in
+    'simple')
+      printf -v _simple_argument_variables '%s%s\n' "${_simple_argument_variables}" "${variable}"
+      printf -v _simple_argument_parameters '%s%s\n' "${_simple_argument_parameters}" "@(${parameter_or_description})"
+      printf -v _simple_argument_descriptions '%s%s\n' "${_simple_argument_descriptions}" "${description}"
+      first_column=$(printf '  [%s] ' "${parameter_or_description}")
+      length=$(( ${#description} + 64 - ${#first_column} ))
+      printf -v ARGUMENTS "%s%s%${length}s\\n" "${ARGUMENTS-}" "${first_column}" "${description}"
+      unset "${variable}"
+      ;;
+    'valued')
+      printf -v _valued_argument_variables '%s%s\n' "${_valued_argument_variables}" "${variable}"
+      printf -v _valued_argument_parameters '%s%s\n' "${_valued_argument_parameters}" "@(${parameter_or_description})"
+      printf -v _valued_argument_descriptions '%s%s\n' "${_valued_argument_descriptions}" "${description}"
+      first_column=$(printf '  [%s %s] ' "${parameter_or_description}" "\$${variable}" )
+      length=$(( ${#description} + 64 - ${#first_column} ))
+      printf -v ARGUMENTS "%s%s%${length}s\\n" "${ARGUMENTS-}" "${first_column}" "${description}"
+      unset "${variable}"
+      ;;
+    'positional')
+      printf -v _positional_argument_variables '%s%s\n' "${_positional_argument_variables}" "${variable}"
+      printf -v _positional_argument_descriptions '%s%s\n' "${_positional_argument_descriptions}" "${parameter_or_description}"
+      first_column=$(printf '  [%s] ' "${variable}")
+      length=$(( ${#parameter_or_description} + 64 - ${#first_column} ))
+      printf -v ARGUMENTS "%s%s%${length}s\\n" "${ARGUMENTS-}" "${first_column}" "${parameter_or_description}"
+      unset "${variable}"
+      ;;
+    *)
+      printf "${RED}ERROR: unsupported argument mode '${mode}', expected simple, valued or positional${RESET}\\n" >&2
+      exit 1
+      ;;
+  esac
+}
+
+# Parse parameters according to defined arguments.
+function parse-parameters() {
+  local _yaml
+
+  # Options
+  _ADDITIONAL_OPTIONS=
+  _ADDITIONAL_PARAMETERS=
+  _yaml_files=()
+  _i=1
+  while (( _i <= ${#} )); do
+    case "${!_i}" in
+    # [-c|--config $config_yaml]   Reads from a YAML configuration and converts all
+    #                              key-value pairs with literal values to
+    #                              environment variables.
+    '-c'|'--config')
+      _ii=$((_i + 1))
+      if (( _ii > ${#} )); then
+        printf "${RED}ERROR: YAML configuration file not provided for -c|--config option${RESET}\\n" >&2
+        exit 1
+      fi
+      _yaml=${!_ii}
+      set -- "${@:1:$((_i - 1))}" "${@:$((_i + 2))}"
+      _yaml_files+=("${_yaml}")
+      _i=$(( _i - 1))
+      ;;
+    # [-d|--debug]                 Enables debug mode, showing every executed
+    #                              statement.
+    '-d'|'--debug')
+      set -vx
+      set -- "${@:1:$((_i - 1))}" "${@:$((_i + 1))}"
+      _i=$(( _i - 1))
+      if ! grep ' \-d' <<<"${_ADDITIONAL_OPTIONS}" > /dev/null; then
+        _ADDITIONAL_OPTIONS+=' -d'
+      fi
+      ;;
+    # [-h|--help]                  Prints usage (this text).
+    '-h'|'--help')
+      if ! grep ' \-h' <<<"${_ADDITIONAL_OPTIONS}" > /dev/null; then
+        _ADDITIONAL_OPTIONS+=' -h'
+      fi
+      print-usage
+      exit 0
+      ;;
+    esac;
+    _i=$(( _i + 1 ))
+  done
+
+  # Source YAML files.
+  for i in "${_yaml_files[@]}"; do
+    . "${LIB_PATH}/yaml-to-env" "${i}"
+  done
+  unset _yaml_files
+
+  local _positional
+  local _variable
+
+  # Arguments
+  while (( ${#} > 0 )); do
+    for i in $(seq 1 $(printf '%s' "${_simple_argument_variables}" | wc -l)); do
+      case "${1}" in $(printf '%s' "${_simple_argument_parameters}" | head -n "${i}" | tail -n 1))
+        _variable=$(printf '%s' "${_simple_argument_variables}" | head -n "${i}" | tail -n 1)
+        export ${_variable}=true
+        if ! grep " ${1}" <<<"${_ADDITIONAL_PARAMETERS}" > /dev/null; then
+          _ADDITIONAL_PARAMETERS+=" ${1}"
+        fi
+        shift
+        continue 2
+      ;; esac
+    done
+    for i in $(seq 1 $(printf '%s' "${_valued_argument_variables}" | wc -l)); do
+      case "${1}" in $(printf '%s' "${_valued_argument_parameters}" | head -n "${i}" | tail -n 1))
+        _criteria=${1}
+        shift
+        _variable=$(printf '%s' "${_valued_argument_variables}" | head -n "${i}" | tail -n 1)
+        export ${_variable}="${1}"
+        _whole_argument_expression=" ${_criteria} ${1}"
+        if ! grep " ${_whole_argument_expression}" <<<"${_ADDITIONAL_PARAMETERS}" > /dev/null; then
+          _ADDITIONAL_PARAMETERS+=" ${_whole_argument_expression}"
+        fi
+        shift
+        continue 2
+      ;; esac
+    done
+    for i in $(seq 1 $(printf '%s' "${_positional_argument_variables}" | wc -l)); do
+      _positional=$(printf '%s' "${_positional_argument_variables}" | head -n "${i}" | tail -n 1)
+      if test -z "${!_positional+x}"; then
+        export "${_positional}"="${1}"
+        if ! grep " ${1}" <<<"${_ADDITIONAL_PARAMETERS}" > /dev/null; then
+          _ADDITIONAL_PARAMETERS+=" ${1}"
+        fi
+        shift
+        continue 2
+      fi
+    done
+
+    # Allow extra parameters?
+    if ${_ALLOW_EXTRA_PARAMETERS-false}; then
+      break
+    fi
+
+    # Unrecognized parameter
+    printf "${RED}ERROR: Unrecognized parameter '%s'${RESET}\\n" "${1}" >&2
+    print-usage
+    exit 1
+  done
+
+  EXTRA_PARAMETERS=( "${@}" )
+}
+
+function allow-extra-parameters() {
+  export _ALLOW_EXTRA_PARAMETERS=true
+}
+
+function add-to-usage() {
+  test -z "${_add_to_usage+x}" && export _add_to_usage=''
+  printf -v _add_to_usage '%s%s\n' "${_add_to_usage}" "${1}"
+}
+
+# Export colors.
+export RESET
+export BLACK
+export RED
+export GREEN
+export YELLOW
+export BLUE
+export PURPLE
+export CYAN
+export WHITE
+
+# Export variables and functions.
+export _ADDITIONAL_OPTIONS
+export _ADDITIONAL_PARAMETERS
+export -f additional-options
+export -f additional-parameters
+export -f allow-extra-parameters
+export -f argument
+export -f parse-parameters
+export -f print-usage
+
+# Export paths.
+export LIB_PATH
+export SCRIPT_PATH
+
+# Get script path and append it to PATH so other scripts are callable.
+export PATH="${PATH}:${SCRIPT_PATH}"

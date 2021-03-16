@@ -1,0 +1,14 @@
+#!/bin/bash
+
+# Copyright (C) 2017-2021 Andrei Pavel, andrei.pavel@mail.com
+# Licensed under the MIT License
+
+#------------------------------------------------------------------------------#
+
+valgrind \
+  --leak-check=full \
+  --show-leak-kinds=all \
+  --track-origins=yes \
+  --verbose \
+  --log-file=valgrind-out.txt \
+  "${@}"

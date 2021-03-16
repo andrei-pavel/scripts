@@ -1,0 +1,26 @@
+#!/bin/bash
+
+# Copyright (C) 2021 Andrei Pavel, andrei.pavel@mail.com
+# Licensed under the MIT License
+
+# Header
+SCRIPT_PATH="$(dirname "$(readlink -f "${0}")")"
+. "${SCRIPT_PATH}/lib/header"
+
+allow-extra-parameters
+
+parse-parameters "${@}"
+set -- "${EXTRA_PARAMETERS[@]}"
+
+#------------------------------------------------------------------------------#
+
+all_gitattributes=$(git ls-files | grep -E '/\.gitattributes$' | xargs);
+if test -n "${all_gitattributes}"; then
+  rm ${all_gitattributes}
+  git add ${all_gitattributes}
+fi
+git diff "${@}"
+if test -n "${all_gitattributes}"; then
+  git reset HEAD ${all_gitattributes} > /dev/null
+  git checkout -- ${all_gitattributes}
+fi

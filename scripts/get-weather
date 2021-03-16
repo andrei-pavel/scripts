@@ -1,0 +1,97 @@
+#!/bin/bash
+
+# Copyright (C) 2017-2021 Andrei Pavel, andrei.pavel@mail.com
+# Licensed under the MIT License
+
+# Header
+SCRIPT_PATH="$(dirname "$(readlink -f "${0}")")"
+. "${SCRIPT_PATH}/lib/header"
+
+parse-parameters "${@}"
+set -- "${EXTRA_PARAMETERS[@]}"
+
+#------------------------------------------------------------------------------#
+
+request='GET / HTTP/1.1
+HOST: wttr.in
+
+'
+
+current_date="$(date +%s)"
+if [[ -s /tmp/my-forecast-timestamp ]]; then
+  timestamp="$(cat /tmp/my-forecast-timestamp)"
+else
+  timestamp=0
+fi
+
+if [[ ! -s /tmp/my-forecast || ! -s /tmp/my-forecast-parsed || ! -s /tmp/my-forecast-timestamp ]] || (( timestamp + 3600 < current_date )); then
+  set +e
+  printf "${request}" | timeout 4s openssl s_client -quiet -connect wttr.in:443 > /tmp/my-forecast 2>/dev/null
+  set -e
+
+  # Some symbols for further use:
+  # ☼ ☀ ☁ ☂ ☇
+  # ☄ ☾ ☽ ❄ ☃
+  # ☈ ⊙ ☉ ℃ ℉
+  # ° ❅ ✺ ϟ
+
+  # Forecast
+  forecast=$(pup 'pre' < /tmp/my-forecast | head -n 4 | tail -n 1 | xargs)
+  i=5
+  re='[a-zA-Z]'
+  while [[ ! ${forecast} =~ ${re} || ${forecast} == *"span"* ]]; do
+    if (( i >= 39 )); then
+      break
+    fi
+    forecast=$(pup 'pre' < /tmp/my-forecast | head -n ${i} | tail -n 1 | xargs)
+    i=$((i + 1))
+  done
+
+  if [[ "${forecast}" == "Clear" ]]; then
+    forecast="✺ ${forecast}"
+  elif [[ "${forecast}" == "Light Rain Shower" ]]; then
+    forecast="☂ ${forecast}"
+  elif [[ "${forecast}" == "Light Rain With Thunderstorm" ]]; then
+    forecast="☂ ${forecast}"
+  elif [[ "${forecast}" == "Mist" ]]; then
+    forecast="${forecast}"
+  elif [[ "${forecast}" == "Partly cloudy" ]]; then
+    forecast="☁ ${forecast}"
+  elif [[ "${forecast}" == "Sunny" ]]; then
+    forecast="✺ ${forecast}"
+  elif [[ "${forecast}" == "Thunderstorm In Vicinity, Rain With Thunderstorm" ]]; then
+    forecast="☂ ${forecast}"
+  fi
+
+  # Minimum
+  for i in 2 3; do
+    minimum=$(pup "pre span:nth-of-type(${i})" < /tmp/my-forecast | head -n 2 | tail -n 1 | xargs)
+    if [[ ! ${minimum} == *[!0-9]* ]]; then
+      break
+    fi
+  done
+
+  # Maximum & degree type
+  maximum=$(pup 'pre span:nth-of-type(4)' < /tmp/my-forecast | head -n 2 | tail -n 1 | xargs)
+  i=11
+  while [[ ! ${degree_type} == *"C"* && ! ${degree_type} == *"F"* ]]; do
+    if (( i >= 45 )); then
+      break
+    fi
+    degree_type=$(pup 'pre' < /tmp/my-forecast | head -n ${i} | tail -n 1 | xargs)
+    i=$((i + 1))
+  done
+  if [[ ${maximum} == *[!0-9]* ]]; then
+    output="${forecast} ${minimum} ${degree_type}"
+  else
+    output="${forecast} ${minimum}-${maximum} ${degree_type}"
+  fi
+  output="$(printf '%s' "${output}" | sed --expression 's/<*span*>//g')"
+
+  # -  Update parsed value & timestamp.
+  printf '%s\n' "${output}" > /tmp/my-forecast-parsed
+  printf '%s\n' "${current_date}" > /tmp/my-forecast-timestamp
+fi
+
+# Output parsed value.
+cat /tmp/my-forecast-parsed

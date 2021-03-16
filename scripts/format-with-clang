@@ -1,0 +1,103 @@
+#!/bin/bash
+#
+# Copyright (C) 2017-2021 Andrei Pavel, andrei.pavel@mail.com
+# Licensed under the MIT License
+#
+# Can be called from anywhere assuming this file is in a git repository.
+
+# Header
+script_path="$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")"
+. "${script_path}/lib/header"
+
+argument 'simple' 'staged' '-s|--staged' 'act only on staged files'
+
+allow-extra-parameters
+
+parse-parameters "${@}"
+set -- "${EXTRA_PARAMETERS[@]}"
+
+#------------------------------------------------------------------------------#
+
+# Customizations
+extensions=( '.cpp' '.cc' '.C' '.cxx' '.m' '.hpp' '.hh' '.h' '.H' '.hxx' '.tpp' )
+
+extensions_regex=''
+first=true
+for i in ${extensions[@]}; do
+  if ${first}; then
+    first=false
+  else
+    extensions_regex+='|'
+  fi
+  extensions_regex+="\\${i}\$"
+done
+
+if [[ "${1-}" = '--staged' ]]; then
+  staged=true
+  shift
+else
+  staged=false
+fi
+
+if [[ "${1-}" = '--already-filtered' ]]; then
+  already_filtered=true
+  shift
+else
+  already_filtered=false
+fi
+
+function get_staged_files() {
+  files=$(git diff --name-only --staged "${file}" | xargs -I{} bash -c 'printf "${PWD}/{}\\n"' | grep -E "${extensions_regex}")
+}
+
+function pushd_toplevel() {
+  local file=${1}
+  if test -f "${file}"; then
+    pushd "$(dirname "${file}")" > /dev/null
+  elif test -d "${file}"; then
+    pushd "${file}" > /dev/null
+  else
+    pushd . > /dev/null
+  fi
+  pushd "$(git rev-parse --show-toplevel)" > /dev/null
+}
+
+function popd_toplevel() {
+  popd > /dev/null
+  popd > /dev/null
+}
+
+# Use current directory when called without an argument.
+if test ${#} = 0; then
+  set -- .
+fi
+
+while (( ${#} > 0 )); do
+  file=${1}
+  if [[ "${file}" != '/'* ]]; then
+    file=$(readlink -f "${file}")
+  fi
+  printf '%s\n' "${file}"
+  pushd_toplevel "${file}"
+  if test -f "${file}"; then
+    if ${already_filtered} || ! ${staged}; then
+      clang-format --style=file -i "${file}"
+    elif ${staged}; then
+      get_staged_files
+      for i in ${files}; do
+        clang-format --style=file -i "${i}"
+      done
+    fi
+  elif test -d "${file}"; then
+    if ${staged}; then
+      get_staged_files
+    else
+      files=$(git ls-files | xargs -I{} bash -c 'printf "${PWD}/{}\\n"' | grep "${file}" | grep -E "${extensions_regex}")
+    fi
+    for i in ${files}; do
+      "${script_path}/format-with-clang" --already-filtered "${i}"
+    done
+  fi
+  popd_toplevel
+  shift
+done

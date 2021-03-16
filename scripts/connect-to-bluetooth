@@ -1,0 +1,69 @@
+#!/bin/bash
+
+# Copyright (C) 2017-2021 Andrei Pavel, andrei.pavel@mail.com
+# Licensed under the MIT License
+
+# Header
+SCRIPT_PATH="$(dirname "$(readlink -f "${0}")")"
+. "${SCRIPT_PATH}/lib/header"
+. "${SCRIPT_PATH}/lib/utils"
+. "${SCRIPT_PATH}/lib/spinner"
+
+(( EUID != 0 )) && exec sudo -- "${0}" "${@}" $(additional-options)
+
+argument 'positional' 'address' 'bluetooth MAC address in the form of 12:34:56:78:9A:BC'
+
+parse-parameters "${@}"
+set -- "${EXTRA_PARAMETERS[@]}"
+
+mandatory address
+
+#------------------------------------------------------------------------------#
+
+tries=0
+while (( tries < 4 )); do
+    tries=$(( tries + 1 ))
+
+    # Soft-unblock.
+    start-spinner 'rfkill'
+      rfkill unblock bluetooth
+    stop-spinner ${?}
+
+    # Restart service.
+    start-spinner 'systemctl restart bluetooth'
+      systemctl restart bluetooth
+    stop-spinner ${?}
+
+    # Start btmgmt.
+    start-spinner 'btmgmt'
+      btmgmt power up || true
+      btmgmt unblock bluetooth || true
+    stop-spinner ${?}
+
+    # btmgmt commands
+    for command in          \
+      'power on'            \
+      'agent on'            \
+      'scan on'             \
+      'discoverable on'     \
+      "trust ${address}"    \
+      "connect ${address}"  \
+    ; do
+      start-spinner "${command}"
+        timeout 4s bash -c "printf \"${command}\" | bluetoothctl"
+      stop-spinner ${?}
+    done
+
+    # Check if it is connected.
+    if test "$(printf 'info %s' "${address}" | bluetoothctl |& grep -Fc "${address} not available")" -eq 0; then
+      break
+    fi
+
+    # Give time to connect.
+    sleep 8
+
+    # Check if it is connected.
+    if test "$(printf 'info %s' "${address}" | bluetoothctl |& grep -Fc "${address} not available")" -eq 0; then
+      break
+    fi
+done

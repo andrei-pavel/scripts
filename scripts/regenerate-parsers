@@ -1,0 +1,44 @@
+#!/bin/bash
+
+# Copyright (C) 2020-2021 Andrei Pavel, andrei.pavel@mail.com
+# Licensed under the MIT License
+
+# Header
+script_path="$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")"
+. "${script_path}/lib/header"
+
+parse-parameters "${@}"
+set -- "${EXTRA_PARAMETERS[@]}"
+
+#------------------------------------------------------------------------------#
+
+pushd "$(git rev-parse --show-toplevel)" > /dev/null
+{
+  find . -type f -name "*.ll" -exec touch {} \;             \
+              -o -name "*.yy" -exec touch {} \;             \
+              -o -name "agent_lexer.cc" -exec rm {} \;      \
+              -o -name "agent_lexer.h" -exec rm {} \;       \
+              -o -name "agent_parser.cc" -exec rm {} \;     \
+              -o -name "agent_parser.h" -exec rm {} \;      \
+              -o -name "d2_lexer.cc" -exec rm {} \;         \
+              -o -name "d2_parser.cc" -exec rm {} \;        \
+              -o -name "d2_parser.h" -exec rm {} \;         \
+              -o -name "dhcp4_lexer.cc" -exec rm {} \;      \
+              -o -name "dhcp4_parser.cc" -exec rm {} \;     \
+              -o -name "dhcp4_parser.h" -exec rm {} \;      \
+              -o -name "dhcp6_lexer.cc" -exec rm {} \;      \
+              -o -name "dhcp6_parser.cc" -exec rm {} \;     \
+              -o -name "dhcp6_parser.h" -exec rm {} \;      \
+              -o -name "lexer.cc" -exec rm {} \;            \
+              -o -name "location.hh" -exec rm {} \;         \
+              -o -name "netconf_lexer.cc" -exec rm {} \;    \
+              -o -name "netconf_parser.cc" -exec rm {} \;   \
+              -o -name "netconf_parser.h" -exec rm {} \;    \
+              -o -name "parser.cc" -exec rm {} \;           \
+              -o -name "parser.h" -exec rm {} \;            \
+              -o -name "position.hh" -exec rm {} \;         \
+              -o -name "stack.hh" -exec rm {} \;
+
+  find . -type f -name 'Makefile' | xargs -I{} bash -c 'make parser -C $(dirname {})'
+}
+popd > /dev/null

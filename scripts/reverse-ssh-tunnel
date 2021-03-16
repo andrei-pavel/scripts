@@ -1,0 +1,21 @@
+#!/bin/bash
+
+# Copyright (C) 2017-2021 Andrei Pavel, andrei.pavel@mail.com
+# Licensed under the MIT License
+
+# Header
+SCRIPT_PATH="$(dirname "$(readlink -f "${0}")")"
+. "${SCRIPT_PATH}/lib/header"
+
+parse-parameters "${@}"
+set -- "${EXTRA_PARAMETERS[@]}"
+
+#------------------------------------------------------------------------------#
+
+export AUTOSSH_GATETIME=0
+autossh \
+  -o ControlPersist=no \
+  -M 0 \
+  -NR 6666:localhost:22 \
+  -p 22 \
+  vultr

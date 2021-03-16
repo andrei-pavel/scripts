@@ -1,0 +1,20 @@
+#!/bin/bash
+#
+# Copyright (C) 2021 Andrei Pavel, andrei.pavel@mail.com
+# Licensed under the MIT License
+
+# Header
+script_path="$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")"
+. "${script_path}/lib/header"
+. "${script_path}/lib/utils"
+
+(( EUID != 0 )) && exec sudo -- "${0}" "${@}" $(additional-options)
+
+allow-extra-parameters
+
+parse-parameters "${@}"
+set -- "${EXTRA_PARAMETERS[@]}"
+
+#------------------------------------------------------------------------------#
+
+virsh list "${@}" | tail -n +3 | tr -s ' ' | cut -d ' ' -f 3 | sort -uV | sed '/^$/d'

@@ -1,0 +1,98 @@
+#!/bin/bash
+
+# Copyright (C) 2017-2021 Andrei Pavel, andrei.pavel@mail.com
+# Licensed under the MIT License
+
+# Header
+SCRIPT_PATH="$(dirname "$(readlink -f "${0}")")"
+. "${SCRIPT_PATH}/lib/header"
+
+argument 'simple' 'left_of' '--left-of' '--left-of'
+argument 'simple' 'right_of' '--right-of' '--right-of'
+argument 'simple' 'above' '--above' '--above'
+argument 'simple' 'below' '--below' '--below'
+argument 'valued' 'filter' '-f' 'criteria to filter monitors by e.g. `HDMI`'
+
+parse-parameters "${@}"
+set -- "${EXTRA_PARAMETERS[@]}"
+
+# Default parameters
+test -z "${filter+x}" && filter=
+
+positions=( ${left_of-} ${right_of-} ${above-} ${below-} )
+
+#------------------------------------------------------------------------------#
+
+function connected() {
+  [[ "$(grep -F "${1}" <<< "${xrandr}" | grep -Fi connected | grep -Fiv disconnected)" != "" ]]
+}
+
+# Determine lid state.
+if [[ -f /proc/acpi/button/lid/LID0/state ]]; then
+  lid_state="$(tr -s ' ' < '/proc/acpi/button/lid/LID0/state' | cut -d ':' -f 2 | xargs)"
+  if [[ "${lid_state}" == 'closed' ]]; then
+    lid_closed=true
+  elif [[ "${lid_state}" == 'open' ]]; then
+    lid_closed=false
+  else
+    printf 'ERROR: Inconsistent lid state %s.\n' "${lid_state}" >&2
+    exit 2
+  fi
+fi
+
+xrandr="$(xrandr)"
+
+# Get displays.
+displays="$(cut -d ' ' -f 1 <<< "${xrandr}" | grep -Fv 'Screen')"
+
+position_candidates=( '--left-of' '--right-of' '--above' '--below' )
+for position_candidate in ${position_candidates[@]}; do
+  found=false
+  for position in ${positions[@]}; do
+    if [[ "${position}" = "${position_candidate}" ]]; then
+      found=true
+      break
+    fi
+  done
+  if ! ${found}; then
+    positions+=( "${position_candidate}" )
+  fi
+done
+
+# Set xrandr arguments.
+arguments=''
+i=0
+for display in ${displays}; do
+  # Determine primary display.
+  [[ -z "${primary+x}" ]] && primary="${display}"
+  # If display doesn't pass user filter, turn off.
+  if [[ -z $(grep -E "${filter}" <<<"${display}") ]]; then
+    arguments+=" --output ${display} --off"
+    continue
+  fi
+
+  if [[ "${display}" == "${primary}" ]]; then
+    if ${lid_closed} || ! connected "${display}"; then
+      # If the primary monitor is closed, turn it off.
+      arguments+=" --output ${display} --off"
+    else
+      # If the primary monitor is open, turn it on.
+      # If lid is open, turn it on.
+      arguments+=" --output ${display} --auto"
+    fi
+  else
+    if ${lid_closed} || ! connected "${display}"; then
+      # If the primary monitor is closed, auto this secondary monitor.
+      arguments+=" --output ${display} --auto"
+    else
+      # If both are open, position the secondary monitor.
+      arguments+=" --output ${display} --auto ${positions[${i}]} ${primary}"
+      (( ++i ))
+    fi
+  fi
+done
+
+if [[ ! -z "${arguments+x}" ]]; then
+  printf '%s\n' "xrandr${arguments}"
+  eval "xrandr${arguments}"
+fi

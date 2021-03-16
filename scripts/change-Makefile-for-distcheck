@@ -1,0 +1,28 @@
+#!/bin/bash
+
+# Copyright (C) 2020-2021 Andrei Pavel, andrei.pavel@mail.com
+# Licensed under the MIT License
+
+# Header
+script_path="$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")"
+. "${script_path}/lib/header"
+
+parse-parameters "${@}"
+set -- "${EXTRA_PARAMETERS[@]}"
+
+#------------------------------------------------------------------------------#
+
+toplevel="$(git rev-parse --show-toplevel)"
+
+pushd "${toplevel}" > /dev/null
+
+version=$(cat ./configure.ac | grep AC_INIT | cut -d ',' -f 2)
+file="${toplevel}/kea-${version}/_build/sub/Makefile"
+
+while ! test -f "${file}"; do
+  sleep 1
+done
+sed 's/\&\& \$(MAKE) \$(AM_MAKEFLAGS) check/\&\& \$(MAKE) \$(AM_MAKEFLAGS) -j 1 check/g' "${file}" > "${file}.tmp"
+mv "${file}.tmp" "${file}"
+
+popd > /dev/null

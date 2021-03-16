@@ -1,0 +1,34 @@
+#!/bin/bash
+
+# Copyright (C) 2017-2021 Andrei Pavel, andrei.pavel@mail.com
+# Licensed under the MIT License
+
+# Header
+SCRIPT_PATH="$(dirname "$(readlink -f "${0}")")"
+. "${SCRIPT_PATH}/lib/header"
+
+argument 'simple' 'no_newline' '-n|--no-newline' 'omit printing newline so the loading bar is updated on the same line'
+argument 'positional' 'progress' 'progress'
+argument 'positional' 'total' 'total'
+
+parse-parameters "${@}"
+set -- "${EXTRA_PARAMETERS[@]}"
+
+# Default parameters
+[[ -z ${no_newline+x} ]] && no_newline=false
+
+#------------------------------------------------------------------------------#
+
+ratio=$((100 * progress / total))
+printf '\n\e[A\e[K['
+for (( x = 0; x < ratio; x++ )); do
+  printf '='
+done
+for (( x = ratio; x < 100; x++ )); do
+  printf ' '
+done
+printf "] %s%% \\r" "${ratio}"
+
+if ! ${no_newline}; then
+  printf '\n'
+fi

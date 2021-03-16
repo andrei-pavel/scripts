@@ -1,0 +1,46 @@
+#!/bin/bash
+
+# Copyright (C) 2017-2021 Andrei Pavel, andrei.pavel@mail.com
+# Licensed under the MIT License
+
+# Header
+SCRIPT_PATH="$(dirname "$(readlink -f "${0}")")"
+. "${SCRIPT_PATH}/lib/header"
+
+argument 'positional' 'file' 'file to read from'
+
+parse-parameters "${@}"
+set -- "${EXTRA_PARAMETERS[@]}"
+
+mandatory file
+
+#------------------------------------------------------------------------------#
+
+saveCursorPosition() {
+  printf '\033[s'
+}
+
+restoreCursorPosition() {
+  printf '\033[u'
+}
+
+moveCursorDown() {
+  for (( i = 0; i < 16; i++ )); do
+    printf '\n'
+  done
+  # printf '\033[16B'
+}
+
+moveCursorUp() {
+  printf '\033[16A'
+}
+
+r=0
+while true; do
+  n=$(wc -l < "${file}")
+  moveCursorDown
+  printf "%s" "$(cat "${file}" | head -n "${n}" | tail -n -$((n - r)))"
+  moveCursorUp
+  r="${n}"
+  sleep 1
+done

@@ -1,0 +1,106 @@
+#!/bin/bash
+
+# Copyright (C) 2020-2021 Andrei Pavel, andrei.pavel@mail.com
+# Licensed under the MIT License
+
+# Header
+SCRIPT_PATH="$(dirname "$(readlink -f "${0}")")"
+. "${SCRIPT_PATH}/lib/header"
+
+(( EUID != 0 )) && exec sudo -- "${0}" "${@}" $(additional-options)
+
+argument 'positional' 'nodes' 'node count in the Galera cluster'
+
+parse-parameters "${@}"
+set -- "${EXTRA_PARAMETERS[@]}"
+
+# Default parameters
+test -z "${nodes+x}" && nodes=1
+
+#------------------------------------------------------------------------------#
+
+max_nodes=5
+if test ${max_nodes} -lt ${nodes}; then
+  printf "${RED}ERROR: a maximum of %s nodes is allowed.${RESET}\\n" "${max_nodes}" >&2
+  exit 1
+fi
+
+cluster_addresses=
+for i in $(seq 2 $((nodes + 1 ))); do
+  cluster_addresses+="172.17.0.${i}:4567"
+  if test -n "${cluster_addresses}" && (( i != nodes + 1 )); then
+    cluster_addresses+=','
+  fi
+done
+
+id="$(docker ps -a -f 'name=mariadb-galera' | tail -n -1 | cut -d ' ' -f 1 | grep -Fv 'CONTAINER' || true)"
+if test -z "${id}"; then
+  docker run \
+    -d \
+    -e 'MARIADB_GALERA_CLUSTER_NAME=cluster' \
+    -e 'MARIADB_GALERA_MARIABACKUP_USER=keatest' \
+    -e 'MARIADB_GALERA_MARIABACKUP_PASSWORD=keatest' \
+    -e 'MARIADB_ROOT_PASSWORD=keatest' \
+    -e 'MARIADB_USER=keatest' \
+    -e 'MARIADB_PASSWORD=keatest' \
+    -e 'MARIADB_DATABASE=keatest' \
+    -e 'MARIADB_REPLICATION_USER=keatest' \
+    -e 'MARIADB_REPLICATION_PASSWORD=keatest' \
+    --name 'mariadb-galera' \
+    -p '3306:3306' \
+    -p '4567:4567' \
+    -p '4568:4568' \
+    -p '4444:4444' \
+    --rm \
+    'bitnami/mariadb-galera:latest'
+    # docker exec -it 'mariadb-galera' bash -c "sed '/\[mysqld\]/a log_warnings=3' /opt/bitnami/mariadb/conf/my.cnf > /tmp/my.cnf; mv /tmp/my.cnf /opt/bitnami/mariadb/conf/my.cnf"
+    # docker exec -it 'mariadb-galera' bash -c "sed 's#wsrep_cluster_address=.*#wsrep_cluster_address=gcomm://${cluster_addresses}#g' /opt/bitnami/mariadb/conf/my.cnf > /tmp/my.cnf; mv /tmp/my.cnf /opt/bitnami/mariadb/conf/my.cnf"
+else
+  docker start 'mariadb-galera'
+fi
+
+# Wait to start.
+echo mysql -h 127.0.0.1 -P 3306 -u root --password='keatest' -e 'quit'
+while ! mysql -h 127.0.0.1 -P 3306 -u root --password='keatest' -e 'quit'; do
+  sleep 1
+done
+
+for i in $(seq 2 ${nodes}); do
+id="$(docker ps -a -f "name=mariadb-galera-${i}" | tail -n -1 | cut -d ' ' -f 1 | grep -Fv 'CONTAINER' || true)"
+  p=$(( i - 1 ))
+  if test -z "${id}"; then
+    docker run \
+      -d \
+      -e 'MARIADB_GALERA_CLUSTER_NAME=cluster' \
+      -e 'MARIADB_GALERA_CLUSTER_ADDRESS=gcomm://mariadb-galera:4567,0.0.0.0:4567' \
+      -e 'MARIADB_GALERA_MARIABACKUP_USER=keatest' \
+      -e 'MARIADB_GALERA_MARIABACKUP_PASSWORD=keatest' \
+      -e 'MARIADB_ROOT_PASSWORD=keatest' \
+      -e 'MARIADB_REPLICATION_USER=keatest' \
+      -e 'MARIADB_REPLICATION_PASSWORD=keatest' \
+      --name "mariadb-galera-${i}" \
+      --link 'mariadb-galera:mariadb-galera' \
+      -p "${p}3306:3306" \
+      -p "${p}4444:4444" \
+      -p "${p}4567:4567" \
+      -p "${p}4568:4568" \
+      --rm \
+      'bitnami/mariadb-galera:latest'
+      # docker exec -it "mariadb-galera-${i}" bash -c "sed '/\[mysqld\]/a log_warnings=3' /opt/bitnami/mariadb/conf/my.cnf > /tmp/my.cnf; mv /tmp/my.cnf /opt/bitnami/mariadb/conf/my.cnf"
+      # docker exec -it "mariadb-galera-${i}" bash -c "sed 's#wsrep_cluster_address=.*#wsrep_cluster_address=gcomm://${cluster_addresses}#g' /opt/bitnami/mariadb/conf/my.cnf > /tmp/my.cnf; mv /tmp/my.cnf /opt/bitnami/mariadb/conf/my.cnf"
+  else
+    docker start "mariadb-galera-${i}"
+  fi
+
+  # Wait to start.
+  echo mysql -h 127.0.0.1 -P "${p}3306" -u root --password='keatest' -e 'quit'
+  while ! mysql -h 127.0.0.1 -P "${p}3306" -u root --password='keatest' -e 'quit'; do
+    sleep 1
+  done
+done
+
+# Show clsuter status.
+extra_nodes=$((nodes - 1))
+for i in '' $(seq 1 ${extra_nodes}); do
+  mysql -h 127.0.0.1 -P "${i}3306" -u root --password='keatest' -e 'SHOW GLOBAL STATUS LIKE "%cluster%";'
+done

@@ -1,0 +1,24 @@
+#!/bin/bash
+
+# Copyright (C) 2017-2021 Andrei Pavel, andrei.pavel@mail.com
+# Licensed under the MIT License
+
+# Header
+SCRIPT_PATH="$(dirname "$(readlink -f "${0}")")"
+. "${SCRIPT_PATH}/lib/header"
+
+argument 'simple' 'minutes' '-m|--minutes' 'display time with minutes resolution rather than seconds'
+
+parse-parameters "${@}"
+set -- "${EXTRA_PARAMETERS[@]}"
+
+#------------------------------------------------------------------------------#
+
+day=$(datediff '1991-07-08' 'now')
+if ${minutes-false}; then
+  date="$(LC_ALL=en_GB.utf8 date +' %A, %e %B %Y - %H:%M:%S')"
+else
+  date="$(LC_ALL=en_GB.utf8 date +' %A, %e %B %Y - %H:%M')"
+fi
+
+printf "⏲  Day ${day} - ${date}\\n"

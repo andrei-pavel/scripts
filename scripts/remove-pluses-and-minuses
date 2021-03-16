@@ -1,0 +1,20 @@
+#!/bin/bash
+
+# Copyright (C) 2017-2021 Andrei Pavel, andrei.pavel@mail.com
+# Licensed under the MIT License
+
+# Header
+SCRIPT_PATH="$(dirname "$(readlink -f "${0}")")"
+. "${SCRIPT_PATH}/lib/header"
+
+#------------------------------------------------------------------------------#
+
+{
+  if test -z "${1+x}"; then
+    while read -r line; do
+      printf '%s\n' "${line}"
+    done
+  else
+    cat "${1}"
+  fi
+} | sed -E 's/^([^-+ ]*)[-+ ]/\1/'

@@ -1,0 +1,42 @@
+#!/bin/bash
+
+# Copyright (C) 2017-2021 Andrei Pavel, andrei.pavel@mail.com
+# Licensed under the MIT License
+
+# Header
+SCRIPT_PATH="$(dirname "$(readlink -f "${0}")")"
+. "${SCRIPT_PATH}/lib/header"
+
+argument 'positional' 'branch' 'branch'
+argument 'positional' 'remote' 'remote'
+
+parse-parameters "${@}"
+set -- "${EXTRA_PARAMETERS[@]}"
+
+mandatory branch
+
+# Default parameters
+[[ -z "${remote+x}" ]] && remote='origin'
+
+#------------------------------------------------------------------------------#
+
+# If local branch exists...
+if [[ -n "$(git branch -l "${branch}")" ]]; then
+  # If you are NOT on that branch...
+  if [[ "$(git branch --points-at HEAD | grep -Fc "${branch}")" != 0 ]]; then
+    # Checkout to it.
+    git checkout "${branch}"
+  fi
+else
+  # Create branch and checkout to it.
+  git checkout -b "${branch}"
+fi
+
+# Set upstream to the remote branch.
+git branch --set-upstream-to="${remote}/${branch}" "${branch}"
+
+# Update.
+git pull
+
+# Push.
+git push "${remote}" "HEAD:${branch}"

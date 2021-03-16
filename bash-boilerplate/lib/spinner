@@ -1,0 +1,218 @@
+#!/bin/bash
+
+# Copyright (C) 2017-2021 Andrei Pavel, andrei.pavel@mail.com
+# Licensed under the MIT License
+#
+# Warning! Nested spinners are not supported.
+
+# Source guard
+test -n "${_LIB_SPINNER_SOURCED+x}" && return 0
+export _LIB_SPINNER_SOURCED=true
+
+. "${LIB_PATH}/traps"
+
+# Print one cycle of spinning.
+function _spinner_cycle () {
+  _cycle=(
+    '[●   ]'
+    '[ ●  ]'
+    '[  ● ]'
+    '[   ●]'
+    '[  ● ]'
+    '[ ●  ]'
+  )
+  if test -z "${1+x}"; then
+    printf '%d' "${#_cycle[@]}"
+  else
+    printf '%s' "${_cycle[${1}]}"
+  fi
+}
+export -f _spinner_cycle
+export _SPINNER_PERIOD='1' # seconds
+
+# Offer support for environments that don't have access to tput. tput is used to
+# hide and show the cursor.
+if command -v tput &> /dev/null; then
+  if tput cvvis &> /dev/null; then
+    function _tput() {
+      tput "${@}"
+    }
+  elif tput -T 'xterm' cvvis &> /dev/null; then
+    function _tput() {
+      tput -T 'xterm' "${@}"
+    }
+  else
+    function _tput() {
+      :
+    }
+  fi
+else
+  function _tput() {
+    :
+  }
+fi
+export -f _tput
+
+# Display message alongside spinner or status text.
+function _display_message() {
+  local mode=${1-}
+  local status=${2-}
+  if test "${mode}" = 'spinning'; then
+    status="$(_spinner_cycle $(( _s % $(_spinner_cycle) )) )"
+    (( ++_s ))
+  fi
+  if test "${mode}" != 'first'; then
+    printf '\e[1A'
+  fi
+  printf "\\r%s%$(($(_tput cols)-${#_MESSAGE}-8))s${status}\\n" "${_MESSAGE}"
+}
+export -f _display_message
+
+# Start or stop spinner.
+function _spinner {
+  case ${1-} in
+    start)
+      _tput civis
+      export _s=0
+      while true; do
+        _display_message 'spinning'
+        sleep ${_SPINNER_PERIOD}
+      done
+      ;;
+
+    stop)
+      test -z "${_SPINNER_PID+x}" && return 1
+      kill "${_SPINNER_PID}" > /dev/null 2>&1
+      local status
+      if (( ${2-0} == 0 )); then
+        status="${GREEN}DONE${RESET}"
+      else
+        status="${GREEN}FAIL${RESET}"
+      fi
+      _display_message 'status' "[${status}]"
+      ;;
+
+    *)
+      printf 'ERROR: invalid parameter, try {start/stop}' >&2
+      exit 2
+      ;;
+  esac
+}
+export -f _spinner
+
+# Check if spinners are enabled.
+function are-spinners-enabled() {
+  test -z "${_SPINNERS_ENABLED+x}" || test "${_SPINNERS_ENABLED}" = true
+}
+export -f are-spinners-enabled
+
+# Check if verbose is enabled.
+function is-verbose-enabled() {
+  test -n "${_SPINNERS_VERBOSE+x}" && test "${_SPINNERS_VERBOSE}" = true
+}
+export -f is-verbose-enabled
+
+# Start spinner.
+function start-spinner() {
+  # Give up if debug is enabled.
+  if printf '%s' "${-}" | grep 'x' &> /dev/null; then
+    return
+  fi
+
+  # Give up if another spinner is already active.
+  if test -n "${_SPINNER_PID+x}"; then
+    return
+  fi
+
+  # Give up if spinners are disabled altogether.
+  if test ! are-spinners-enabled; then
+    return
+  fi
+
+  export _MESSAGE="${1-}"
+  _display_message 'first'
+  _spinner 'start' &
+  _BUFFER="$(mktemp)"
+  export _BUFFER
+  if test -z "${_SPINNERS_OUTPUT+x}" || test "${_SPINNERS_OUTPUT}" = 'full-output'; then
+    exec 3>&1 1>"${_BUFFER}" 2>&1
+  elif test "${_SPINNERS_OUTPUT}" = 'stdout-only'; then
+    exec 3>&1 1>"${_BUFFER}" 2>/dev/null
+  elif test "${_SPINNERS_OUTPUT}" = 'stderr-only'; then
+    exec 3>&1 1>/dev/null 2>"${_BUFFER}"
+  elif test "${_SPINNERS_OUTPUT}" = 'no-output'; then
+    exec 3>&1 1>/dev/null 2>/dev/null
+  fi
+  export _SPINNER_PID="${!}"
+  disown
+}
+export -f start-spinner
+
+# Stop spinner.
+function stop-spinner() {
+  _tput cvvis
+
+  # Give up if debug is enabled.
+  if printf '%s' "${-}" | grep 'x' &> /dev/null; then
+    return
+  fi
+
+  # Give up if no spinner is active.
+  if test -z "${_SPINNER_PID+x}"; then
+    return
+  fi
+
+  # Give up if spinners are disabled altogether.
+  if test ! are-spinners-enabled; then
+    return
+  fi
+
+  exec 1>&3
+  local exit_code="${1-0}"
+  _spinner 'stop' "${exit_code}"
+  unset _SPINNER_PID
+  if (( exit_code != 0 )) || is-verbose-enabled; then
+    cat "${_BUFFER}"
+  fi
+  rm "${_BUFFER}"
+}
+export -f stop-spinner
+
+# Disable spinners.
+function disable-spinners() {
+  traps "${_THE_TRAP}" --return-code-only
+  export SPINNERS_ENABLED=false
+}
+export -f disable-spinners
+
+# Disable verbose.
+function disable-verbose() {
+  export SPINNERS_VERBOSE=false
+}
+export -f disable-verbose
+
+# Configure spinner output to stdout, stderr, both or none.
+function configure-spinner-output() {
+  export SPINNERS_OUTPUT=${1-}
+  if test "${_SPINNERS_OUTPUT}" != 'full-output' &&
+     test "${_SPINNERS_OUTPUT}" != 'stdout-only' &&
+     test "${_SPINNERS_OUTPUT}" != 'stderr-only' &&
+     test "${_SPINNERS_OUTPUT}" != 'no-output'; then
+    printf 'wrong spinner output %s\n' "${mode}" 2>/dev/null
+    return 1
+  fi
+}
+export -f configure-spinner-output
+
+# Enable spinners.
+function enable-spinners() {
+  traps "${_THE_TRAP}"
+  export SPINNERS_ENABLED=true
+}
+export -f enable-spinners
+
+# Enable verbose.
+function enable-verbose() {
+  export SPINNERS_VERBOSE=true
+}
+export -f enable-verbose

@@ -1,0 +1,29 @@
+#!/bin/bash
+
+# Copyright (C) 2017-2021 Andrei Pavel, andrei.pavel@mail.com
+# Licensed under the MIT License
+
+# Header
+SCRIPT_PATH="$(dirname "$(readlink -f "${0}")")"
+. "${SCRIPT_PATH}/lib/header"
+
+allow-extra-parameters
+
+parse-parameters "${@}"
+set -- "${EXTRA_PARAMETERS[@]}"
+
+#------------------------------------------------------------------------------#
+
+if (( EUID != 0 )); then
+  s=sudo
+else
+  s=
+fi
+
+user=${USER}
+group=$(stat -c %G "${HOME}")
+if test "${#}" -gt 0; then
+  ${s} chown -R "${user}:${group}" "${@}"
+else
+  ${s} chown -R "${user}:${group}" .
+fi

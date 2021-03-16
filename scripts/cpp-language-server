@@ -1,0 +1,19 @@
+#!/bin/bash
+
+# Copyright (C) 2017-2021 Andrei Pavel, andrei.pavel@mail.com
+# Licensed under the MIT License
+
+# Header
+SCRIPT_PATH="$(dirname "$(readlink -f "${0}")")"
+. "${SCRIPT_PATH}/lib/header"
+
+#------------------------------------------------------------------------------#
+
+init='{
+  "cacheDirectory": "/tmp/cpp-language-server",
+  "index": {
+    "comments": 1
+  }
+}'
+
+ccls -init="${init}" -log-file='/var/log/cpp-language-server.log' "${@}"

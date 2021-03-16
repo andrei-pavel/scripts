@@ -1,0 +1,30 @@
+#!/bin/bash
+
+# Copyright (C) 2017-2021 Andrei Pavel, andrei.pavel@mail.com
+# Licensed under the MIT License
+
+# Header
+SCRIPT_PATH="$(dirname "$(readlink -f "${0}")")"
+. "${SCRIPT_PATH}/lib/header"
+
+parse-parameters "${@}"
+set -- "${EXTRA_PARAMETERS[@]}"
+
+#------------------------------------------------------------------------------#
+
+# Launch.
+weather="$(get-open-weather)"
+song="$(get-song)"
+temperature="$(get-temperature)"
+battery="$(get-battery)"
+free_space="$(get-free-space)"
+date="$(get-date --no-seconds)"
+
+# Display.
+printf " %s | %s | %s | %s | %s | %s \\n" \
+  "${weather}" \
+  "${song}" \
+  "${temperature}" \
+  "${battery}" \
+  "${free_space}" \
+  "${date}"

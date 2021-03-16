@@ -1,0 +1,17 @@
+#!/bin/bash
+
+# Copyright (C) 2017-2021 Andrei Pavel, andrei.pavel@mail.com
+# Licensed under the MIT License
+
+# Header
+SCRIPT_PATH="$(dirname "$(readlink -f "${0}")")"
+. "${SCRIPT_PATH}/lib/header"
+
+#------------------------------------------------------------------------------#
+
+# Call with a prompt string or use a default.
+read -r -p "${1:-Are you sure? [y/N]}" response
+  case "${response}" in
+  [yY][eE][sS]|[yY]) true ;;
+  *) false ;;
+esac

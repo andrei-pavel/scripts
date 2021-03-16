@@ -1,0 +1,31 @@
+#!/bin/bash
+
+# Copyright (C) 2017-2021 Andrei Pavel, andrei.pavel@mail.com
+# Licensed under the MIT License
+
+# Header
+SCRIPT_PATH="$(dirname "$(readlink -f "${0}")")"
+. "${SCRIPT_PATH}/lib/header"
+
+parse-parameters "${@}"
+set -- "${EXTRA_PARAMETERS[@]}"
+
+#------------------------------------------------------------------------------#
+
+json="$(curl -s -X 'GET' "http://api.openweathermap.org/data/2.5/weather?q=Bucharest&APPID=${OPEN_WEATHER_MAP_TOKEN}")"
+
+description="$(printf '%s' "${json}" | jq -r '.weather | map(.description) | join(", ")')"
+kelvin_temperature="$(printf '%s' "${json}" | jq '.main.temp')"
+if [[ -z "${kelvin_temperature}" ]]; then
+  temperature='<offline>'
+else
+  temperature="$(printf '%s\n' "${kelvin_temperature} - 273.15" | bc | cut -d '.' -f 1) ℃ "
+fi
+
+case "${description}" in
+  *'snow'*) icon='❄️ ' ;;
+  *'clouds'*|*'mist'*|*'rain'*) icon='☁' ;;
+  *'clear sky'*) icon='✺' ;;
+esac
+
+printf '%s %s %s\n' "${icon}" "${description}" "${temperature}"

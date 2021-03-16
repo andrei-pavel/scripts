@@ -1,0 +1,23 @@
+#!/bin/bash
+
+# Copyright (C) 2017-2021 Andrei Pavel, andrei.pavel@mail.com
+# Licensed under the MIT License
+
+# Header
+SCRIPT_PATH="$(dirname "$(readlink -f "${0}")")"
+. "${SCRIPT_PATH}/lib/header"
+
+parse-parameters "${@}"
+set -- "${EXTRA_PARAMETERS[@]}"
+
+#------------------------------------------------------------------------------#
+
+directories="$(find . -type f -name '*.cc' | xargs dirname | uniq | sort -V)"
+directory_count="$(wc -l <<< "${directories}")"
+objects=0
+for dir in ${directories}; do
+  if find "${dir}" -mindepth 1 -maxdepth 1 | grep -E '\.o$' > /dev/null; then
+    objects="$((objects + 1))"
+  fi
+done
+loading-bar "${objects}" "${directory_count}"

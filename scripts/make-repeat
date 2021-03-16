@@ -1,0 +1,25 @@
+#!/bin/bash
+
+# Copyright (C) 2017-2021 Andrei Pavel, andrei.pavel@mail.com
+# Licensed under the MIT License
+
+# Header
+SCRIPT_PATH="$(dirname "$(readlink -f "${0}")")"
+. "${SCRIPT_PATH}/lib/header"
+
+#------------------------------------------------------------------------------#
+
+# Make repeatedly.
+while true; do
+  reset
+  make CXXFLAGS=-Wno-error -j 4 ${@} 2>&1 || true
+  exit_status="${PIPESTATUS[0]}"
+  if (( ${exit_status} == 0 )); then
+    sleep 10s
+  else
+    printf "Press any key to build again..."
+    read -n 1 -r key
+    : "${key}"  # unused
+    printf '\n'
+  fi
+done

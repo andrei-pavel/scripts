@@ -1,0 +1,24 @@
+#!/bin/bash
+
+# Copyright (C) 2017-2021 Andrei Pavel, andrei.pavel@mail.com
+# Licensed under the MIT License
+
+# Header
+SCRIPT_PATH="$(dirname "$(readlink -f "${0}")")"
+. "${SCRIPT_PATH}/lib/header"
+
+parse-parameters "${@}"
+set -- "${EXTRA_PARAMETERS[@]}"
+
+#------------------------------------------------------------------------------#
+
+thermal_zones="$(find /sys/class/thermal -maxdepth 1 -mindepth 1)"
+
+temperature=0
+thermal_zone_count=0
+for thermal_zone in $(printf '%s' "${thermal_zones}"); do
+  file="${thermal_zone}/temp"
+  [[ -f ${file} ]] && temperature=$((temperature + "$(cat "${thermal_zone}/temp")")) && thermal_zone_count=$(( thermal_zone_count + 1 ))
+done
+
+printf '🌡 %s °C\n' "$(printf '%s\n' "${temperature} / ${thermal_zone_count} / 1000" | bc)"

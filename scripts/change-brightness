@@ -1,0 +1,52 @@
+#!/bin/bash
+
+# Copyright (C) 2017-2021 Andrei Pavel, andrei.pavel@mail.com
+# Licensed under the MIT License
+
+# Header
+SCRIPT_PATH="$(dirname "$(readlink -f "${0}")")"
+. "${SCRIPT_PATH}/lib/header"
+. "${SCRIPT_PATH}/lib/utils"
+
+argument 'simple' 'alternate' '-a|--alternate' 'alternate between 0% and 100%'
+argument 'positional' 'brightness' 'brightness in the form of a numeral or a percentage'
+
+parse-parameters "${@}"
+set -- "${EXTRA_PARAMETERS[@]}"
+
+#------------------------------------------------------------------------------#
+
+# if percentage, remove percentage sign.
+percentage=false
+if [[ -n "${brightness+x}" ]]; then
+  if [[ "${brightness:${#brightness}-1}" == '%' ]]; then
+    brightness="${brightness:0:-1}"
+    percentage=true
+  fi
+fi
+
+monitors="$(find '/sys/class/backlight' -maxdepth 1 -mindepth 1)"
+
+for monitor in $(printf '%s' "${monitors}"); do
+  current_brightness="$(cat "${monitor}/brightness")"
+  max_brightness="$(cat "${monitor}/max_brightness")"
+
+  if ${alternate-false}; then
+    if [[ ${current_brightness} = 0 ]]; then
+      # 100%
+      brightness=100
+    else
+      # 0%
+      brightness=0
+    fi
+  fi
+
+  if ${percentage} || ${alternate-false}; then
+    scalar_brightness="$((brightness * max_brightness / 100))"
+  else
+    scalar_brightness="${brightness}"
+  fi
+
+  printf '%d' "${scalar_brightness}" | tee "${monitor}/brightness"
+  printf '\n'
+done

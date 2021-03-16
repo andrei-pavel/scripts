@@ -1,0 +1,26 @@
+#!/bin/bash
+
+# Copyright (C) 2020-2021 Andrei Pavel, andrei.pavel@mail.com
+# Licensed under the MIT License
+
+# Header
+script_path="$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")"
+. "${script_path}/lib/header"
+
+parse-parameters "${@}"
+set -- "${EXTRA_PARAMETERS[@]}"
+
+#------------------------------------------------------------------------------#
+
+pushd "$(git rev-parse --show-toplevel)" > /dev/null
+{
+  find . -type f -name 'Makefile' | xargs -I{} bash -c '
+  dir=$(dirname {});
+  if [[ ${dir} != ./tools && ${dir} != ./src/lib/log ]]; then
+    rm -rf "${dir}"/*_messages.{cc,h}
+    make clean-messages -C "${dir}"
+    make messages -C "${dir}"
+  fi
+  '
+}
+popd > /dev/null

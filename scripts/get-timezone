@@ -1,0 +1,28 @@
+#!/bin/bash
+
+# Copyright (C) 2017-2021 Andrei Pavel, andrei.pavel@mail.com
+# Licensed under the MIT License
+
+# Header
+SCRIPT_PATH="$(dirname "$(readlink -f "${0}")")"
+. "${SCRIPT_PATH}/lib/header"
+
+parse-parameters "${@}"
+set -- "${EXTRA_PARAMETERS[@]}"
+
+#------------------------------------------------------------------------------#
+
+# timedatectl
+if command -V timedatectl &> /dev/null; then
+  timedatectl | grep 'Time zone' | cut -d ':' -f 2 | cut -d '(' -f 1 | xargs
+  exit ${?}
+fi
+
+# Brute force
+for i in $(find /usr/share/zoneinfo | cut -d '/' -f 5- | grep -E '^[A-Z][a-z]+/[A-Z][a-z]+$' | sort -uV); do
+  unset TZ
+  if test "$(date)" = "$(TZ="${i}" date)"; then
+    printf '%s\n' "${i}"
+    break
+  fi
+done

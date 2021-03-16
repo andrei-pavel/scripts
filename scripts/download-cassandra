@@ -1,0 +1,55 @@
+#!/bin/bash
+
+# Copyright (C) 2017-2021 Andrei Pavel, andrei.pavel@mail.com
+# Licensed under the MIT License
+
+# Header
+script_path="$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")"
+. "${script_path}/lib/header"
+. "${script_path}/lib/utils"
+. "${script_path}/lib/traps"
+
+argument 'simple' 'list' '-l|--list' 'only list versions'
+argument 'valued' 'version' '-v|--version' 'Cassandra version'
+
+parse-parameters "${@}"
+set -- "${EXTRA_PARAMETERS[@]}"
+
+test -z "${list+x}" && test -z "${version+x}" || either_list_or_version=true
+
+mandatory either_list_or_version
+
+# Default parameters
+test -z "${list+x}" && list=false
+
+#------------------------------------------------------------------------------#
+
+function download-cassandra-main() {
+  if ${list} || test -z "${version+x}"; then
+    local file='/tmp/download-cassandra-index.html'
+    traps "rm -f '${file}'"
+    curl -o "${file}" -L 'http://archive.apache.org/dist/cassandra' &> /dev/null
+    pup 'a text{}' < "${file}" | grep -Eo '^[0-9]+[0-9.a-zA-Z\\-]*' | sort -uV
+    return 0
+  fi
+
+  # version can be something of the form '3.0.17'
+  local url="http://archive.apache.org/dist/cassandra/${version}/apache-cassandra-${version}-bin.tar.gz"
+  local file="./apache-cassandra-${version}-bin.tar.gz"
+  if test -f "${file}"; then
+    local md5=$(md5sum "${file}" | cut -d ' ' -f 1)
+    local remote_md5=$(curl "${url}.md5")
+  fi
+  if test "${md5-x}" != "${remote_md5-y}"; then
+    curl -o "${file}" "${url}"
+  fi
+  file_format=$(file "${file}")
+  if [[ "${file_format}" != *'gzip'* ]]; then
+    printf 'ERROR: file is %s instead of gzip format. The following URL is no longer available. Change it in script.
+      %s
+  ' "${file_format}" "${url}" >&2
+    exit 2
+  fi
+}
+
+download-cassandra-main

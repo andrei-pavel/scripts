@@ -1,0 +1,20 @@
+#!/bin/bash
+
+# Copyright (C) 2017-2021 Andrei Pavel, andrei.pavel@mail.com
+# Licensed under the MIT License
+
+# Header
+script_path="$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")"
+. "${script_path}/lib/header"
+. "${script_path}/lib/traps"
+. "${script_path}/lib/utils"
+
+argument 'simple' 'empty_superuser_password' '-e|--empty' 'use no password for the superuser'
+
+parse-parameters "${@}"
+set -- "${EXTRA_PARAMETERS[@]}"
+
+#------------------------------------------------------------------------------#
+
+cqlsh -u 'keatest' -p 'keatest' -e \
+  "CREATE KEYSPACE IF NOT EXISTS keatest WITH replication = {'class': 'SimpleStrategy', 'replication_factor': 1}"

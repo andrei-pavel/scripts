@@ -1,0 +1,51 @@
+#!/bin/bash
+
+# Copyright (C) 2017-2021 Andrei Pavel, andrei.pavel@mail.com
+# Licensed under the MIT License
+
+# Header
+SCRIPT_PATH="$(dirname "$(readlink -f "${0}")")"
+. "${SCRIPT_PATH}/lib/header"
+
+argument 'positional' 'wallpaper' 'wallpaper to be set'
+
+parse-parameters "${@}"
+set -- "${EXTRA_PARAMETERS[@]}"
+
+# Default parameters
+test -z "${wallpaper+x}" && wallpaper='/usr/local/share/wallpaper.png'
+
+#------------------------------------------------------------------------------#
+
+kde() {
+  dbus-send --session --dest=org.kde.plasmashell --type=method_call /PlasmaShell org.kde.PlasmaShell.evaluateScript "$(printf "\
+string:
+  var Desktops = desktops();
+  for (i=0;i<Desktops.length;i++) {
+    d = Desktops[i];
+    d.wallpaperPlugin = \"org.kde.image\";
+    d.currentConfigGroup = Array(\"Wallpaper\",
+                                 \"org.kde.image\",
+                                 \"General\");
+    d.writeConfig(\"Image\", \"file://${wallpaper}\");
+  }
+"
+  )"
+}
+
+gnome() {
+  gsettings set org.gnome.desktop.background picture-uri "file://${wallpaper}"
+}
+
+universal() {
+  feh --bg-scale "${wallpaper}"
+  # wal -t -i '/usr/local/share/wallpaper.png'
+}
+
+resolution="$(xrandr | grep current | awk -F 'current' '{ print $2 }' | awk -F ',' '{ print $1 }' | xargs | sed 's/ //g')"
+sudo convert -blur 0x8 -resize "${resolution}" "${wallpaper}" '/usr/local/share/wallpaper.png'
+
+universal
+kde
+
+betterlockscreen -u '/usr/local/share/wallpaper.png'

@@ -1,0 +1,82 @@
+#!/bin/bash
+
+# Copyright (C) 2020-2021 Andrei Pavel, andrei.pavel@mail.com
+# Licensed under the MIT License
+
+# Header
+script_path="$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")"
+. "${script_path}/lib/header"
+
+(( EUID != 0 )) && exec sudo -- "${0}" "${@}" $(additional-options)
+
+argument 'positional' 'v' '4 or 6'
+
+allow-extra-parameters
+
+parse-parameters "${@}"
+set -- "${EXTRA_PARAMETERS[@]}"
+#------------------------------------------------------------------------------#
+
+if test -z "${v+x}" || test "${v}" != '4' && test "${v}" != '6'; then
+  printf "${RED}ERROR: parameter expected to be 4 or 6, got: '%s'${RESET}\\n" "${v}" >&2
+  print-usage
+  exit 1
+fi
+
+configure() {
+  local key=${1}
+  local value=${2}
+
+  if grep -E "^${key} =" ./tests/init_all.py &> /dev/null; then
+    sed -i.tmp "s%^${key} = .*$%${key} = ${value}%g" ./tests/init_all.py
+  elif grep -E "^[# ]*${key} =" ./tests/init_all.py &> /dev/null; then
+    sed -i.tmp "s%^[# ]*${key} = .*$%${key} = ${value}%g" ./tests/init_all.py
+  else
+    printf '%s\n' "${key} = ${value}" >> ./tests/init_all.py
+  fi
+}
+
+# Virtual environment
+if ! test -d ./virtualenv; then
+  virtualenv --python=python3 virtualenv
+  . ./virtualenv/bin/activate
+  ./virtualenv/bin/pip install --upgrade pip
+  ./virtualenv/bin/pip install -r requirements.txt
+fi
+
+# init_all.py
+if ! test -f ./tests/init_all.py; then
+  cp ./tests/init_all.py_default ./tests/init_all.py
+  printf '\n' > ./tests/init_all.py
+  sed -i.tmp 's/^\([a-zA-Z]\)/# \1/g' ./tests/init_all.py
+  configure 'CIADDR' "'10.0.122.30'"
+  configure 'DNS_IFACE' "'enp7s0'"
+  configure 'DNS4_ADDR' "'10.0.122.163'"
+  configure 'DNS6_ADDR' "'2001:db8::122:163'"
+  configure 'GIADDR4' "'10.0.122.30'"
+  configure 'IFACE' "'enp7s0'"
+  configure 'MGMT_ADDRESS' "'192.168.122.163'"
+  configure 'MGMT_USERNAME' "'andrei'"
+  configure 'MGMT_PASSWORD' "'passw0rd'"
+  configure 'MGMT_ADDRESS_2' "''"
+  configure 'MGMT_USERNAME_2' "''"
+  configure 'MGMT_PASSWORD_2' "''"
+  configure 'SERVER_IFACE' "'enp7s0'"
+  configure 'SOFTWARE_INSTALL_PATH' "'/opt/kea'"
+  configure 'SOFTWARE_UNDER_TEST' "('kea${v}_server'),"
+  configure 'SRV_IPV6_ADDR_GLOBAL' "'2001:db8::122:163'"
+  configure 'SRV_IPV6_ADDR_LINK_LOCAL' "'fe80::5054:ff:fe6b:94b5'"
+  configure 'SRV4_ADDR' "'10.0.122.163'"
+  remove-comments ./tests/init_all.py
+  in-place sort -uV ./tests/init_all.py
+  sed -i.tmp '/^$/d' ./tests/init_all.py
+fi
+
+# Validate configuration.
+./virtualenv/bin/python ./tests/forge_cfg.py -T
+
+# Run tests.
+timestamp=$(date +%Y-%m-%d-%H:%M:%S)
+pkill -f pytest || true
+nohup ./virtualenv/bin/pytest --junitxml "kea-${v}-aggregated-${timestamp}.xml" -m "v${v} and not ddns and not disabled and not HA" "${@}" > "output-${timestamp}.txt" 2> "error-${timestamp}.txt" &
+tail -f "output-${timestamp}.txt" "error-${timestamp}.txt"

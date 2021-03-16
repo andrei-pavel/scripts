@@ -1,0 +1,26 @@
+#!/bin/bash
+
+# Copyright (C) 2020-2021 Andrei Pavel, andrei.pavel@mail.com
+# Licensed under the MIT License
+
+# Header
+script_path="$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")"
+. "${script_path}/lib/header"
+
+allow-extra-parameters
+
+parse-parameters "${@}"
+set -- "${EXTRA_PARAMETERS[@]}"
+
+#------------------------------------------------------------------------------#
+
+toplevel="$(git rev-parse --show-toplevel)"
+test_results="${toplevel}/test-results"
+pushd "${toplevel}" > /dev/null
+rm -rf "${test_results}"
+\
+  GTEST_BRIEF=1 \
+  GTEST_OUTPUT="xml:${test_results}/" \
+  /usr/bin/make -j 1 -k check "${@}"
+  check-kea-results
+popd > /dev/null

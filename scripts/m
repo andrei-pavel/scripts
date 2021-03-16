@@ -1,0 +1,38 @@
+#!/bin/bash
+
+# Copyright (C) 2020-2021 Andrei Pavel, andrei.pavel@mail.com
+# Licensed under the MIT License
+
+# Header
+SCRIPT_PATH="$(dirname "$(readlink -f "${0}")")"
+. "${SCRIPT_PATH}/lib/header"
+
+#------------------------------------------------------------------------------#
+
+# function my-make() {
+#   version=$(bear --version | grep -Eo '[0-9]' | head -n 1)
+#   parameter='--'
+#   if (( version < 3 )); then
+#   parameter='-a'
+#   fi
+#   make='/usr/bin/make'
+#   for lib_bear in \
+#     /usr/lib/bear/libear.so \
+#     /usr/lib64/bear/libear.so \
+#   ; do
+#     if test -f "${lib_bear}"; then
+#       bear --libear "${lib_bear}" "${parameter}" "${make}" -j "$(procs)" "${@}"
+#       return ${?}
+#     fi
+#   done
+#   bear "${parameter}" "${make}" -j "$(procs)" "${@}"
+# }
+
+toplevel=$(git rev-parse --show-toplevel)
+if test ! -z "${toplevel}" && test -d "${toplevel}"; then
+  rm -rf "/opt/$(basename "${toplevel}")"
+  pushd "${toplevel}/build" &> /dev/null || pushd "${toplevel}" > /dev/null
+fi
+
+make -j "$(procs)" "${@}" && \
+make install "${@}"

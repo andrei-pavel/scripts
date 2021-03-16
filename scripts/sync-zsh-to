@@ -1,0 +1,20 @@
+#!/bin/bash
+
+# Copyright (C) 2017-2021 Andrei Pavel, andrei.pavel@mail.com
+# Licensed under the MIT License
+
+# Header
+SCRIPT_PATH="$(dirname "$(readlink -f "${0}")")"
+. "${SCRIPT_PATH}/lib/header"
+
+#------------------------------------------------------------------------------#
+
+for host in "${@}"; do
+  rsync-synchronize ~/.zprezto/ "${host}:.zprezto/"
+  ssh "${host}" zsh <<HERE_DOCUMENT
+  setopt EXTENDED_GLOB
+  for rcfile in "\${ZDOTDIR:-\${HOME}}"/.zprezto/runcoms/^README.md(.N); do
+    ln -s "\${rcfile}" "\${ZDOTDIR:-\${HOME}}/.\${rcfile:t}"
+  done
+HERE_DOCUMENT
+done

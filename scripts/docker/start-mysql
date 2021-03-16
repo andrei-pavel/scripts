@@ -1,0 +1,60 @@
+#!/bin/bash
+
+# Copyright (C) 2017-2021 Andrei Pavel, andrei.pavel@mail.com
+# Licensed under the MIT License
+
+# Header
+script_path="$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")"
+. "${script_path}/lib/header"
+. "${script_path}/lib/traps"
+. "${script_path}/lib/utils"
+
+(( EUID != 0 )) && exec sudo -- "${0}" "${@}" $(additional-options)
+
+argument 'simple' 'empty_superuser_password' '-e|--empty' 'use no password for the superuser'
+
+parse-parameters "${@}"
+set -- "${EXTRA_PARAMETERS[@]}"
+
+#------------------------------------------------------------------------------#
+
+if "${empty_superuser_password-false}"; then
+  password_parameters=( -e MYSQL_ALLOW_EMPTY_PASSWORD=yes )
+  client_password_parameters=()
+else
+  password_parameters=( -e MYSQL_ROOT_PASSWORD=keatest )
+  client_password_parameters=( --password='keatest' )
+fi
+
+id="$(docker ps -a -f 'name=mysql' | tail -n -1 | cut -d ' ' -f 1 | grep -Fv 'CONTAINER' || true)"
+
+if test -z "${id}"; then
+  sudo mkdir -p /run/mysqld
+  sudo chown -R root:root /run/mysqld
+  sudo chmod -R 777 /run/mysqld
+  mkdir -p /var/lib/mysql
+  mkdir -p /run/mysqld
+  if test ! -e /var/lib/mysql/mysql.sock && test ! -L /var/lib/mysql/mysql.sock; then
+    ln -s /run/mysqld/mysqld.sock /var/lib/mysql/mysql.sock
+  fi
+
+  docker run -d \
+    "${password_parameters[@]}" \
+    -e 'MYSQL_USER=keatest' \
+    --name 'mysql' \
+    -p '3306:3306' \
+    -v '/run/mysqld:/run/mysqld' \
+    --rm "${@}" 'mariadb'
+else
+  docker start 'mysql'
+fi
+
+# Wait to start.
+"${script_path}/wait-for-mysql" $(additional-parameters) $(additional-options)
+
+# Set time zone.
+timezone=$(get-timezone)
+mysql -u root "${client_password_parameters[@]}" -e "SET GLOBAL time_zone = '${timezone}';"
+
+# Create database and users.
+mysql-create-database-and-users $(additional-parameters) $(additional-options)

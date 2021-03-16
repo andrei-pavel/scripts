@@ -1,0 +1,37 @@
+#!/bin/bash
+
+# Copyright (C) 2019-2021 Andrei Pavel, andrei.pavel@mail.com
+# Licensed under the MIT License
+
+# Header
+SCRIPT_PATH="$(dirname "$(readlink -f "${0}")")"
+. "${SCRIPT_PATH}/lib/header"
+
+allow-extra-parameters
+
+parse-parameters "${@}"
+set -- "${EXTRA_PARAMETERS[@]}"
+
+#------------------------------------------------------------------------------#
+
+if ! command -v cargo &> /dev/null; then
+  curl https://sh.rustup.rs -sSf | sh
+  rustup install nightly
+  rustup default nightly
+fi
+cargo install bat cargo-update exa git-delta ripgrep topgrade
+
+version=
+while true; do
+  new_version=$(topgrade --version)
+  if test "${new_version}" = "${version}"; then
+    break;
+  fi
+  topgrade --cleanup --no-retry --yes "${@}"
+  version=${new_version}
+done
+
+(( EUID != 0 )) && sudo -- "${0}" "${@}" $(additional-options) \
+  --disable flutter \
+  --disable vscode \
+  --disable system

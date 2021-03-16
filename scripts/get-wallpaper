@@ -1,0 +1,27 @@
+#!/bin/bash
+
+# Copyright (C) 2017-2021 Andrei Pavel, andrei.pavel@mail.com
+# Licensed under the MIT License
+
+# Header
+SCRIPT_PATH="$(dirname "$(readlink -f "${0}")")"
+. "${SCRIPT_PATH}/lib/header"
+
+parse-parameters "${@}"
+set -- "${EXTRA_PARAMETERS[@]}"
+
+#------------------------------------------------------------------------------#
+
+kde() {
+  :
+}
+
+gnome() {
+  printf "$(gsettings get org.gnome.desktop.background picture-uri | sed 's+file://++' | xargs)\n"
+}
+
+universal() {
+  printf '/usr/local/share/wallpaper.png\n'
+}
+
+universal

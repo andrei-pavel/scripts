@@ -1,0 +1,12 @@
+#!/bin/bash
+
+# Copyright (C) 2017-2021 Andrei Pavel, andrei.pavel@mail.com
+# Licensed under the MIT License
+
+# Header
+SCRIPT_PATH="$(dirname "$(readlink -f "${0}")")"
+. "${SCRIPT_PATH}/lib/header"
+
+#------------------------------------------------------------------------------#
+
+cpplint.py ${@} 2>&1 | grep --invert-match --extended-regexp "\[build/header_guard\]|\[whitespace/indent\]|\[build/namespaces\]|\[runtime/arrays\]|\[runtime/references\]"

@@ -1,0 +1,49 @@
+#!/bin/bash
+
+# Copyright (C) 2020-2021 Andrei Pavel, andrei.pavel@mail.com
+# Licensed under the MIT License
+
+# Header
+SCRIPT_PATH="$(dirname "$(readlink -f "${0}")")"
+. "${SCRIPT_PATH}/lib/header"
+
+parse-parameters "${@}"
+set -- "${EXTRA_PARAMETERS[@]}"
+
+#------------------------------------------------------------------------------#
+
+# Find the global IPv4 address for this host.
+if [[ -n "${1+x}" ]] ; then
+  # Use command line argument, if present.
+  global_ipv4=${1}
+else
+  # Use the address of the interface that has the default route.
+  device=$(route | awk '/^default / { print $8 }' | xargs | cut -d ' ' -f 1)
+  [[ -z "${device}" ]] || global_ipv4=$(ip a s "${device}" | sed -n 's/ *inet \([0-9.]*\).*/\1/p')
+fi
+if [[ -z "${global_ipv4}" ]] ; then
+  echo >&2 'No IPv4 address for the 6to4 tunnel'
+  exit 1
+fi
+
+# Compute the 6to4 tunnel IPv6 address.
+global_ip6to4=$(printf '2002:%02x%02x:%x%02x::1' $(echo ${global_ipv4} | tr . ' '))
+
+case "${global_ip6to4}" in
+    2002:0a*|2002:1f1*|2002:c0a8:*|2002:7f*)
+  echo >&2 "6to4 needs a global IPv4 address, ${global_ipv4} on ${device} is local"
+esac
+
+global_ip6to4=$(traceroute google.com | head -n 3 | tail -n 1 | xargs | cut -d ' ' -f 3 | sed 's/[()]//g') || true
+
+case "${global_ip6to4}" in
+    2002:0a*|2002:1f1*|2002:c0a8:*|2002:7f*)
+  echo >&2 "6to4 needs a global IPv4 address, ${global_ipv4} on ${device} is local"
+  exit 2
+esac
+
+# Setup the tunnel.
+ip tunnel add tun6to4 mode sit remote any local $global_ipv4 ttl 64 || true
+ip link set dev tun6to4 up
+ip addr add $global_ip6to4/16 dev tun6to4
+ip route add 2000::/3 via ::192.88.99.1 dev tun6to4 metric 1024

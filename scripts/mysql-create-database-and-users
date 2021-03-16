@@ -1,0 +1,33 @@
+#!/bin/bash
+
+# Copyright (C) 2017-2021 Andrei Pavel, andrei.pavel@mail.com
+# Licensed under the MIT License
+
+# Header
+script_path="$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")"
+. "${script_path}/lib/header"
+
+argument 'simple' 'empty_superuser_password' '-e|--empty' 'use no password for the superuser'
+
+allow-extra-parameters
+
+parse-parameters "${@}"
+set -- "${EXTRA_PARAMETERS[@]}"
+
+#------------------------------------------------------------------------------#
+
+if "${empty_superuser_password-false}"; then
+  password_parameters=()
+else
+  password_parameters=( --password='keatest' )
+fi
+
+for statement in                                                            \
+  "CREATE USER IF NOT EXISTS 'keatest' IDENTIFIED BY 'keatest';"            \
+  'GRANT ALL ON *.* TO keatest;'                                            \
+  'CREATE DATABASE IF NOT EXISTS keatest;'                                  \
+  "CREATE USER IF NOT EXISTS 'keatest_readonly' IDENTIFIED BY 'keatest';"   \
+  'GRANT SELECT ON keatest.* TO keatest_readonly;'                          \
+  ; do
+  mysql -N -B -u root "${password_parameters[@]}" -e "${statement}" "${@}"
+done

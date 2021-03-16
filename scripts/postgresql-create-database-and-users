@@ -1,0 +1,56 @@
+#!/bin/bash
+
+# Copyright (C) 2017-2021 Andrei Pavel, andrei.pavel@mail.com
+# Licensed under the MIT License
+
+# Header
+script_path="$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")"
+. "${script_path}/lib/header"
+. "${script_path}/lib/traps"
+. "${script_path}/lib/utils"
+
+argument 'simple' 'empty_superuser_password' '-e|--empty' 'use no password for the superuser'
+
+allow-extra-parameters
+
+parse-parameters "${@}"
+set -- "${EXTRA_PARAMETERS[@]}"
+
+#------------------------------------------------------------------------------#
+
+if "${empty_superuser_password-false}"; then
+  unset PGPASSWORD
+else
+  export PGPASSWORD=keatest
+fi
+
+for statement in                                                                \
+  "DO \$\$
+  BEGIN
+    CREATE USER keatest WITH PASSWORD 'keatest' CREATEDB;
+    EXCEPTION WHEN DUPLICATE_OBJECT THEN
+    RAISE NOTICE 'User keatest already exists, not created.';
+  END \$\$;"                                                                    \
+  "
+    SELECT 'CREATE DATABASE keatest'
+    WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = 'keatest')
+    \\gexec
+  " \
+  'GRANT ALL PRIVILEGES ON DATABASE keatest TO keatest;'                        \
+  "DO \$\$
+  BEGIN
+    CREATE USER keatest_readonly WITH PASSWORD 'keatest';
+    EXCEPTION WHEN DUPLICATE_OBJECT THEN
+    RAISE NOTICE 'User keatest_readonly already exists, not created.';
+  END \$\$;"                                                                    \
+  ; do
+  printf '%s' "${statement}" | \
+    psql --set ON_ERROR_STOP=1 -A -t -q -U 'postgres' "${@}"
+done
+
+printf '%s %s'                                                                  \
+  'ALTER DEFAULT PRIVILEGES IN SCHEMA public'                                   \
+  'GRANT SELECT ON TABLES TO keatest_readonly;'                                 \
+  | psql --set ON_ERROR_STOP=1 -A -t -q -U 'keatest' -d 'keatest' "${@}"
+
+unset PGPASSWORD

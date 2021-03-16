@@ -1,0 +1,31 @@
+#!/bin/bash
+
+# Copyright (C) 2017-2021 Andrei Pavel, andrei.pavel@mail.com
+# Licensed under the MIT License
+
+# Header
+script_path="$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")"
+. "${script_path}/lib/header"
+
+allow-extra-parameters
+
+parse-parameters "${@}"
+set -- "${EXTRA_PARAMETERS[@]}"
+
+#------------------------------------------------------------------------------#
+
+toplevel="$(git rev-parse --show-toplevel)"
+
+pi_flags='-fPIC -fPIE'
+
+pushd "${toplevel}" > /dev/null
+  mkdir -p ./build
+  pushd ./build > /dev/null
+    cmake .. \
+      -DCASS_BUILD_STATIC=ON \
+      -DCMAKE_C_FLAGS="${pi_flags}" -DCMAKE_CXX_FLAGS="${pi_flags}" \
+      -DCMAKE_INSTALL_PREFIX='/opt/cpp-driver' \
+      "${@}"
+    make
+  popd > /dev/null
+popd > /dev/null

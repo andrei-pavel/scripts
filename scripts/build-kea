@@ -1,0 +1,35 @@
+#!/bin/bash
+
+# Copyright (C) 2017-2021 Andrei Pavel, andrei.pavel@mail.com
+# Licensed under the MIT License
+
+# Header
+script_path="$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")"
+. "${script_path}/lib/header"
+
+argument 'simple' 'show_only' '-s|--show-only' 'only show command'
+
+allow-extra-parameters
+
+parse-parameters "${@}"
+set -- "${EXTRA_PARAMETERS[@]}"
+
+# Default arguments
+test -z "${show_only+x}" && show_only=false
+
+if ${show_only}; then
+  e='echo'
+else
+  e=
+fi
+
+#------------------------------------------------------------------------------#
+
+configure-kea $(additional-parameters)
+
+toplevel="$(git rev-parse --show-toplevel)"
+pushd "${toplevel}" > /dev/null
+
+${e} make -j "$(procs)"
+
+popd > /dev/null

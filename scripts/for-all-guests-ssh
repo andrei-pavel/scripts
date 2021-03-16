@@ -1,0 +1,28 @@
+#!/bin/bash
+#
+# Copyright (C) 2017-2021 Andrei Pavel, andrei.pavel@mail.com
+# Licensed under the MIT License
+
+# Header
+script_path="$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")"
+. "${script_path}/lib/header"
+. "${script_path}/lib/utils"
+
+(( EUID != 0 )) && exec sudo -- "${0}" "${@}" $(additional-options)
+
+allow-extra-parameters
+
+parse-parameters "${@}"
+set -- "${EXTRA_PARAMETERS[@]}"
+
+#------------------------------------------------------------------------------#
+
+pids=()
+for guest in $(all-guests); do
+  ssh "${guest}" "cat /etc/hostname /etc/rc.conf 2> /dev/null | head -n 1; ${@}" &
+  pids+=( ${!} )
+done
+
+for pid in ${pids[@]}; do
+  wait "${pid}"
+done

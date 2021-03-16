@@ -1,0 +1,25 @@
+#!/bin/bash
+
+# Copyright (C) 2021 Andrei Pavel, andrei.pavel@mail.com
+# Licensed under the MIT License
+
+# Header
+SCRIPT_PATH="$(dirname "$(readlink -f "${0}")")"
+. "${SCRIPT_PATH}/lib/header"
+
+(( EUID != 0 )) && exec sudo -- "${0}" "${@}" $(additional-options)
+
+argument 'positional' 'v' '4 or 6'
+
+allow-extra-parameters
+
+parse-parameters "${@}"
+set -- "${EXTRA_PARAMETERS[@]}"
+
+#------------------------------------------------------------------------------#
+
+if test "$(ip netns list | grep -Ecw 'clientns')" != 1; then
+  initialize-virtual-interfaces -n 2 $(additional-options)
+fi
+
+ip netns exec clientns perfdhcp "-${v}" -l vethclient -r 1 -t 1 "${@}"

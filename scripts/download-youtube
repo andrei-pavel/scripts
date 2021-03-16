@@ -1,0 +1,35 @@
+#!/bin/bash
+
+# Copyright (C) 2021 Andrei Pavel, andrei.pavel@mail.com
+# Licensed under the MIT License
+
+# Header
+SCRIPT_PATH="$(dirname "$(readlink -f "${0}")")"
+. "${SCRIPT_PATH}/lib/header"
+
+argument 'positional' 'url' 'URL to download from'
+argument 'positional' 'start_position' 'position to start from e.g. 00:02:04'
+argument 'positional' 'length' 'length to cut at e.g. 00:00:08'
+
+parse-parameters "${@}"
+set -- "${EXTRA_PARAMETERS[@]}"
+
+#------------------------------------------------------------------------------#
+
+file_name='youtube-dl'
+rm -f "/tmp/${file_name}"*
+youtube-dl -o "/tmp/${file_name}" "${url}"
+rm -f /tmp/a.mp4
+if test -n "${start_position+x}"; then
+  if test -n "${length+x}"; then
+    ffmpeg -ss "${start_position}" -i "/tmp/${file_name}"* -t "${length}" -async 1 -strict -2 /tmp/a.mp4
+  else
+    ffmpeg -ss "${start_position}" -i "/tmp/${file_name}"* -async 1 -strict -2 /tmp/a.mp4
+  fi
+else
+  if printf '%s' "${file_name}" | grep -E '\.mp4$' &> /dev/null; then
+    cp "/tmp/${file_name}.mp4" /tmp/a.mp4
+  else
+    ffmpeg -i "/tmp/${file_name}"* -async 1 -strict -2 /tmp/a.mp4
+  fi
+fi

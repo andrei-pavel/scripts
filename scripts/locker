@@ -1,0 +1,17 @@
+#!/bin/bash
+
+# Copyright (C) 2017-2021 Andrei Pavel, andrei.pavel@mail.com
+# Licensed under the MIT License
+
+# Header
+SCRIPT_PATH="$(dirname "$(readlink -f "${0}")")"
+. "${SCRIPT_PATH}/lib/header"
+
+#------------------------------------------------------------------------------#
+
+exec xautolock   \
+  -detectsleep   \
+  -time 10       \
+  -locker 'lock' \
+  -notify 30     \
+  -notifier 'notify-send -u critical -t 10000 -- ''Locking screen in 30 seconds...'''

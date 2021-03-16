@@ -1,0 +1,21 @@
+#!/bin/bash
+
+# Copyright (C) 2017-2021 Andrei Pavel, andrei.pavel@mail.com
+# Licensed under the MIT License
+
+# Header
+SCRIPT_PATH="$(dirname "$(readlink -f "${0}")")"
+. "${SCRIPT_PATH}/lib/header"
+
+parse-parameters "${@}"
+set -- "${EXTRA_PARAMETERS[@]}"
+
+#------------------------------------------------------------------------------#
+
+mkdir -p ~/.mozilla//firefox
+find ~/.mozilla/firefox -mindepth 1 -maxdepth 1 -type d -name '*.default*' | xargs -I{} bash -c '
+  mkdir -p {}/chrome;
+  cp ~/.config/templates/firefox/prefs.js {}/prefs.js;
+  cp ~/.config/templates/firefox/userChrome.css {}/chrome/userChrome.css
+  rsync-synchronize ~/.config/templates/firefox/extensions/ {}/extensions/
+'

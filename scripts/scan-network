@@ -1,0 +1,25 @@
+#!/bin/bash
+
+# Copyright (C) 2017-2021 Andrei Pavel, andrei.pavel@mail.com
+# Licensed under the MIT License
+
+# Header
+SCRIPT_PATH="$(dirname "$(readlink -f "${0}")")"
+. "${SCRIPT_PATH}/lib/header"
+
+argument 'positional' 'gateway_network' 'network to search on'
+
+parse-parameters "${@}"
+set -- "${EXTRA_PARAMETERS[@]}"
+
+#------------------------------------------------------------------------------#
+
+if test -z "${gateway_network+x}"; then
+  gateway_network=$(get-internet-facing-network)
+fi
+scan=$(nmap -sP -n ${gateway_network})
+for address in $(printf '%s' "${scan}" | grep -F 'Nmap scan report for' | cut -d ' ' -f 5); do
+  printf '%s' "${scan}" | grep -A2 -E "${address}$" -U0 | grep -E "^Nmap scan report for ${address}$|^Host is up |^MAC Address: "
+  ssh "${address}" 'printf "Host name: "; cat /etc/hostname' 2> /dev/null || true
+  printf '===\n'
+done

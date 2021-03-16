@@ -1,0 +1,77 @@
+#!/bin/bash
+
+# Copyright (C) 2017-2021 Andrei Pavel, andrei.pavel@mail.com
+# Licensed under the MIT License
+
+# Header
+SCRIPT_PATH="$(dirname "$(readlink -f "${0}")")"
+. "${SCRIPT_PATH}/lib/header"
+. "${SCRIPT_PATH}/lib/utils"
+
+argument 'positional' 'pids_or_names' 'filter processes by process IDs or names'
+
+parse-parameters "${@}"
+set -- "${EXTRA_PARAMETERS[@]}"
+
+# Default parameters
+test -z "${pids_or_names+x}" && pids_or_names=1
+
+#------------------------------------------------------------------------------#
+
+if is-integral $(additional-options) "${pids_or_names}"; then
+  pids=${pids_or_names}
+else
+  current_pid="${$}"
+  pids=$(pgrep -f "${pids_or_names}" | grep -Fv "${current_pid}" | xargs)
+fi
+
+ps_output=$(ps -eww --no-header -o pid,ppid | grep -Ev '[[:digit:]]+[[:space:]]+0')
+first=true
+families=
+for pid in ${pids}; do
+  if ! sudo kill -s 0 "${pid}" &> /dev/null; then
+    # Process no longer exists. This is checked mainly to avoid the child grep
+    # that pgrep introduces.
+    continue
+  fi
+  ancestors=$(awk -vp="${pid}" '
+      {
+        pid = $1
+        ppid[pid] = $2
+        sub(/([[:space:]]*[[:digit:]]+){2}[[:space:]]*/, "")
+        name[pid] = $0
+      }
+      END {
+        while (p) {
+          print p, name[p]
+          p = ppid[p]
+        }
+      }
+    ' <<<"${ps_output}"
+  )
+  descendants=$(awk -vp="${pid}" '
+      function r(s) {
+        print s
+        s = a[s]
+        while(s) {
+          sub(",","",s)
+          t = s
+          sub(",.*","",t)
+          sub("[0-9]+","",s)
+          r(t)
+        }
+      }
+      {
+        a[$2]=a[$2]","$1
+      }
+      END{
+        r(p)
+      }
+    ' <<<"${ps_output}"
+  )
+  family="$(echo ${ancestors} ${descendants} | sed 's/ /\n/g' | sort -V | uniq)"
+  families="$(echo ${families} ${family} | sed 's/ /\n/g' | sort -V | uniq)"
+done
+if [[ -n "${families}" ]]; then
+  ps -fww --forest ${families}
+fi

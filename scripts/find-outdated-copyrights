@@ -1,0 +1,80 @@
+#!/bin/bash
+
+# Copyright (C) 2017-2021 Andrei Pavel, andrei.pavel@mail.com
+# Licensed under the MIT License
+
+# Header
+SCRIPT_PATH="$(dirname "$(readlink -f "${0}")")"
+. "${SCRIPT_PATH}/lib/header"
+
+argument 'simple' 'amend' '-a|--amend' 'amend the file with the correct copyright'
+argument 'simple' 'exclude_old' '-e|--exclude-old' 'include copyrights older than last year'
+argument 'valued' 'owner' '-o|--owner' 'owner of the copyright to be found'
+
+parse-parameters "${@}"
+set -- "${EXTRA_PARAMETERS[@]}"
+
+# Default parameters
+test -z "${amend+x}" && amend=false
+test -z "${exclude_old+x}" && exclude_old=false
+test -z "${owner+x}" && owner='Andrei Pavel, andrei.pavel@mail.com'
+
+#------------------------------------------------------------------------------#
+
+copyright_regex_pattern="Copyright \\(C\\) .* ${owner}"
+current_year="$(date +%Y)"
+escaped_owner=$(sed 's/[^^\\]/[&]/g; s/\^/\\^/g; s/\\/\\\\/g' <<<"${owner}")
+escaped_copyright_regex_pattern="Copyright \\(C\\) .* ${escaped_owner}"
+
+printf 'Looking for %s up to %s...\n' "\"${copyright_regex_pattern}\"" "${current_year}"
+
+function print-outdated() {
+  while (( ${#} > 0 )); do
+    i="${1}"
+    shift
+    if test ! -f ${i}; then
+     continue
+    fi
+    local last_modified="$(git log -1 --pretty=format:'%aD' "${i}" | cut -d ' ' -f 4)"
+    local last_copyrighted="$(grep -E "${escaped_copyright_regex_pattern}" < "${i}" | grep -Eo '[0-9]{4}' | tail -n 1)"
+    if test -z "${last_modified}" || test "${last_modified}" = "${last_copyrighted}"; then
+      continue
+    fi
+    if "${exclude_old}" && (( 1 < current_year - last_copyrighted )); then
+      continue
+    fi
+    printf '%s - found %s, expected %s\n' "${i}" "${last_copyrighted}" "${last_modified}"
+    if ! ${amend}; then
+      continue
+    fi
+    sed -i.tmp "s/^\(.*\)-${last_copyrighted}\(.*\)${owner}/\1-${last_modified}\2${owner}/g" "${i}"
+    sed -i.tmp "s/^\(.*\)${last_copyrighted}\(.*\)${owner}/\1${last_copyrighted}-${last_modified}\2${owner}/g" "${i}"
+    printf '  ^ corrected\n'
+    shift
+  done
+}
+
+function print-unclaimed() {
+  while (( ${#} > 0 )); do
+    if ! grep -F "${owner}" "${1}" > /dev/null; then
+      printf '%s - unclaimed\n' "${1}"
+    fi
+    shift
+  done
+}
+
+export amend
+export current_year
+export escaped_copyright_regex_pattern
+export exclude_old
+export owner
+export -f print-outdated
+export -f print-unclaimed
+
+pushd "$(git rev-parse --show-toplevel)" > /dev/null
+{
+  git ls-files . | xargs -I{} bash -c 'test -f {} && readlink -f {}' | \
+    xargs grep -E "${escaped_copyright_regex_pattern}" /dev/null | cut -d ':' -f 1 | sort -V | uniq | \
+    xargs -I{} bash -c "print-outdated {}; print-unclaimed {};"
+}
+popd > /dev/null

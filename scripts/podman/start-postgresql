@@ -1,0 +1,56 @@
+#!/bin/bash
+
+# Copyright (C) 2017-2021 Andrei Pavel, andrei.pavel@mail.com
+# Licensed under the MIT License
+
+# Header
+script_path="$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")"
+. "${script_path}/lib/header"
+. "${script_path}/lib/traps"
+. "${script_path}/lib/utils"
+
+(( EUID != 0 )) && exec sudo -- "${0}" "${@}" $(additional-options)
+
+parse-parameters "${@}"
+set -- "${EXTRA_PARAMETERS[@]}"
+
+#------------------------------------------------------------------------------#
+
+# Pull image.
+id=$(podman ps -a -f 'name=postgresql' | grep -Fv 'CONTAINER' || true | head -n 1 | cut -d ' ' -f 1)
+
+if test -z "${id}"; then
+  directory="/var/lib/db/postgresql"
+  rm -rf "${directory}"
+  mkdir -p "${directory}"
+  mkdir -p /var/lib/postgresql/data
+  mkdir -p /var/run/postgresql
+  if test ! -e /var/run/postgresql/.s.PGSQL.5432 && test ! -L /var/run/postgresql/.s.PGSQL.5432; then
+    ln -s /var/lib/postgresql/data/ /var/run/postgresql/.s.PGSQL.5432
+  fi
+  POSTGRES_USER=postgres POSTGRES_PASSWORD=postgres podman run -d \
+    -e 'POSTGRES_USER' -e 'POSTGRES_PASSWORD' \
+    --name 'postgresql' -p '5432:5432' --rm \
+    -v "${directory}:/var/lib/postgresql/data" \
+    -v '/var/run/postgresql:/var/run/postgresql' \
+    "${@}" 'postgres'
+fi
+
+# Start container.
+if test "$(podman inspect 'postgresql' || true | jq -r '.[].State.Status')" != 'running'; then
+  podman start 'postgresql'
+fi
+
+# Wait to start.
+"${script_path}/wait-for-postgresql" $(additional-options)
+
+# Adjust time zone.
+if test -z "${id}"; then
+  timezone="$(timedatectl | grep 'Time zone' | cut -d ':' -f 2 | cut -d '(' -f 1 | xargs)"
+  sed -i.tmp "s#^timezone = .*\$#timezone = '${timezone}'#g" "${directory}/postgresql.conf"
+  sed -i.tmp "s#^log_timezone = .*\$#log_timezone = '${timezone}'#g" "${directory}/postgresql.conf"
+  podman restart 'postgresql'
+
+  # Wait to start.
+  "${script_path}/wait-for-postgresql" $(additional-options)
+fi

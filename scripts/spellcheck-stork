@@ -1,0 +1,29 @@
+#!/bin/bash
+
+# Copyright (C) 2021 Andrei Pavel, andrei.pavel@mail.com
+# Licensed under the MIT License
+
+# Header
+SCRIPT_PATH="$(dirname "$(readlink -f "${0}")")"
+. "${SCRIPT_PATH}/lib/header"
+
+argument 'positional' 'input' 'input to process'
+
+parse-parameters "${@}"
+set -- "${EXTRA_PARAMETERS[@]}"
+
+#------------------------------------------------------------------------------#
+
+if test -n "${input+x}"; then
+  aspell list < "${input}" 2> /dev/null
+else
+  for i in $(find . -type f \
+         -not -name '*.ico' \
+    -and -not -name '*.png' \
+    | grep -Fv './.git' \
+  ); do
+    aspell list < ${i} 2> /dev/null
+  done
+fi | sort -uV > /tmp/spellcheck-stork.txt
+
+diff /tmp/spellcheck-stork.txt /etc/.spellcheck-stork.txt | grep -E '^<'

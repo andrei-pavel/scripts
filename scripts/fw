@@ -1,0 +1,24 @@
+#!/bin/bash
+
+# Copyright (C) 2017-2021 Andrei Pavel, andrei.pavel@mail.com
+# Licensed under the MIT License
+
+# Header
+SCRIPT_PATH="$(dirname "$(readlink -f "${0}")")"
+. "${SCRIPT_PATH}/lib/header"
+. "${SCRIPT_PATH}/lib/utils"
+
+argument 'positional' 'command' 'command to be inspected'
+
+parse-parameters "${@}"
+set -- "${EXTRA_PARAMETERS[@]}"
+
+mandatory command
+
+#------------------------------------------------------------------------------#
+
+if file="$(command -v "${command}" 2>&1)"; then
+  file "${file}"
+else
+  printf "${RED}ERROR: Command '%s' does not exist?!${RESET}\\n" "${command}" >&2 && exit 2
+fi

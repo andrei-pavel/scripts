@@ -1,0 +1,28 @@
+#!/bin/bash
+
+# Copyright (C) 2017-2021 Andrei Pavel, andrei.pavel@mail.com
+# Licensed under the MIT License
+
+# Header
+SCRIPT_PATH="$(dirname "$(readlink -f "${0}")")"
+. "${SCRIPT_PATH}/lib/header"
+
+parse-parameters "${@}"
+set -- "${EXTRA_PARAMETERS[@]}"
+
+#------------------------------------------------------------------------------#
+
+if (( EUID == 0 )); then
+  loginctl lock-sessions && exit 0
+else
+  sudo loginctl lock-sessions && exit 0
+fi
+i3lock-fancy &> /dev/null && i3lock-fancy && exit 0
+i3lock --blur=1 &> /dev/null && exit 0
+i3lock --image="$(get-wallpaper)" --tiling &> /dev/null && exit 0
+qdbus org.freedesktop.ScreenSaver /ScreenSaver Lock && exit 0
+output=$(betterlockscreen -l blur 2>&1)
+if (( ${?} == 0 )) && ! grep 'unrecognized' <<<"${output}" &> /dev/null; then
+  exit 0
+fi
+xtrlock &> /dev/null && exit 0

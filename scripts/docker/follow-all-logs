@@ -1,0 +1,40 @@
+#!/bin/bash
+
+# Copyright (C) 2017-2021 Andrei Pavel, andrei.pavel@mail.com
+# Licensed under the MIT License
+
+# Header
+SCRIPT_PATH="$(dirname "$(readlink -f "${0}")")"
+. "${SCRIPT_PATH}/lib/header"
+. "${SCRIPT_PATH}/lib/traps"
+
+(( EUID != 0 )) && exec sudo -- "${0}" "${@}" $(additional-options)
+
+parse-parameters "${@}"
+set -- "${EXTRA_PARAMETERS[@]}"
+
+#------------------------------------------------------------------------------#
+
+if test -z "${NOHUPPED+x}"; then
+  export NOHUPPED=true
+  bash -c "nohup ${0} ${@} $(additional-options) &> /dev/null &"
+  exit 0
+fi
+
+test -f /tmp/docker/lockfile && exit 0
+traps 'rm -rf /tmp/docker/lockfile'
+mkdir -p /tmp/docker
+rm -rf /tmp/docker/*
+touch /tmp/docker/lockfile
+touch /tmp/docker/log-IDs
+
+while true; do
+  for i in $(docker ps -q); do
+    if ! grep -F "${i}" /tmp/docker/log-IDs > /dev/null; then
+      konsole --profile 'scrollback' -e "docker logs -f ${i}" 2> /dev/null &
+      docker logs -f "${i}" &> "/tmp/docker/${i}.log" &
+      printf '%s\n' "${i}" >> /tmp/docker/log-IDs
+    fi
+  done
+  sleep 1
+done

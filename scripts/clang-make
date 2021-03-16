@@ -1,0 +1,12 @@
+#!/bin/bash
+
+# Copyright (C) 2018-2021 Andrei Pavel, andrei.pavel@mail.com
+# Licensed under the MIT License
+
+# Header
+SCRIPT_PATH="$(dirname "$(readlink -f "${0}")")"
+. "${SCRIPT_PATH}/lib/header"
+
+#------------------------------------------------------------------------------#
+
+bear -a make CXX='clang++' -j 4 "${@}" LDFLAGS+="-lstdc++"

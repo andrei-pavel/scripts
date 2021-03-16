@@ -1,0 +1,18 @@
+#!/bin/bash
+
+# Copyright (C) 2019-2021 Andrei Pavel, andrei.pavel@mail.com
+# Licensed under the MIT License
+
+# Header
+SCRIPT_PATH="$(dirname "$(readlink -f "${0}")")"
+. "${SCRIPT_PATH}/lib/header"
+
+parse-parameters "${@}"
+set -- "${EXTRA_PARAMETERS[@]}"
+
+#------------------------------------------------------------------------------#
+
+mkdir '/tmp/frames'
+ffmpeg -i "${1}" -r 5 '/tmp/frames/frame-%03d.jpg'
+convert -delay 20 -loop 0 /tmp/frames/*.jpg ./a.gif
+rm -rf '/tmp/frames'

@@ -1,0 +1,43 @@
+#!/bin/bash
+
+# Copyright (C) 2021 Andrei Pavel, andrei.pavel@mail.com
+# Licensed under the MIT License
+
+# Header
+script_path="$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")"
+. "${script_path}/lib/header"
+
+argument 'simple' 'show_only' '-s|--show-only' 'only show command'
+
+allow-extra-parameters
+
+parse-parameters "${@}"
+set -- "${EXTRA_PARAMETERS[@]}"
+
+# Default arguments
+test -z "${show_only+x}" && show_only=false
+
+#------------------------------------------------------------------------------#
+
+toplevel="$(git rev-parse --show-toplevel)"
+prefix='/opt/freeradius-client'
+
+if ${show_only}; then
+  e='echo'
+else
+  e=
+fi
+
+if test "$(git rev-parse --abbrev-ref HEAD)" != 'iscdev'; then
+  ${e} git checkout 'iscdev'
+fi
+
+if test ! -f ./configure; then
+  ${e} autoreconf -f -i
+fi
+
+if test ! -f ./Makefile; then
+  ${e} ./configure --prefix="${prefix}" "${@}"
+fi
+
+${e} make -j "$(procs)"

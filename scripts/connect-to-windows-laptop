@@ -1,0 +1,19 @@
+#!/bin/bash
+
+# Copyright (C) 2017-2021 Andrei Pavel, andrei.pavel@mail.com
+# Licensed under the MIT License
+
+# Header
+SCRIPT_PATH="$(dirname "$(readlink -f "${0}")")"
+. "${SCRIPT_PATH}/lib/header"
+
+parse-parameters "${@}"
+set -- "${EXTRA_PARAMETERS[@]}"
+
+#------------------------------------------------------------------------------#
+
+pkill -f 'remmina' || true
+
+filename="$(find "${HOME}/.remmina" -type f -name '*.remmina' | xargs grep '192.168.0.105' /dev/null | cut -d ':' -f 1)"
+
+exec remmina -c "${filename}"

@@ -1,0 +1,58 @@
+#!/bin/bash
+
+# Copyright (C) 2017-2021 Andrei Pavel, andrei.pavel@mail.com
+# Licensed under the MIT License
+
+# Header
+script_path="$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")"
+. "${script_path}/lib/header"
+. "${script_path}/lib/traps"
+. "${script_path}/lib/utils"
+
+(( EUID != 0 )) && exec sudo -- "${0}" "${@}" $(additional-options)
+
+argument 'simple' 'scylla' '-s|--scylla' 'use ScyllaDB rather than Apache Cassandra'
+
+parse-parameters "${@}"
+set -- "${EXTRA_PARAMETERS[@]}"
+
+# Default arguments
+test -z "${scylla+x}" && scylla=false
+
+#------------------------------------------------------------------------------#
+
+# Decide on name.
+if ${scylla}; then
+  aio_max_nr=$(sysctl -n fs.aio-max-nr)
+  if (( aio_max_nr < 1048576 )); then
+    sudo sysctl -w fs.aio-max-nr=1048576
+  fi
+  container='scylla'
+  other_container='cassandra'
+else
+  container='cassandra'
+  other_container='scylla'
+fi
+
+# Stop other container.
+id=$(podman ps -a -f "name=${other_container}" | grep -Fv 'CONTAINER' || true | head -n 1 | cut -d ' ' -f 1)
+if test -n "${id}"; then
+  podman stop "${other_container}"
+fi
+
+# Pull image.
+id=$(podman ps -a -f "name=${container}" | grep -Fv 'CONTAINER' || true | head -n 1 | cut -d ' ' -f 1)
+if test -z "${id}"; then
+  if ${scylla}; then
+    podman run -d --name "${container}" -p '9042:9042' --rm "${@}" 'scylladb/scylla' --broadcast-address='127.0.0.1' --experimental 1
+  else
+    BROADCAST_ADDRESS=127.0.0.1 podman run -d -e 'BROADCAST_ADDRESS' --name "${container}" -p '9042:9042' --rm "${@}" 'cassandra'
+  fi
+else
+  if test "$(podman inspect "${container}" || true | jq -r '.[].State.Status')" != 'running'; then
+    podman start "${container}"
+  fi
+fi
+
+# Wait to start.
+"${script_path}/wait-for-cassandra" $(additional-options)

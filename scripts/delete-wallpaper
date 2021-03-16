@@ -1,0 +1,23 @@
+#!/bin/bash
+
+# Copyright (C) 2017-2021 Andrei Pavel, andrei.pavel@mail.com
+# Licensed under the MIT License
+
+# Header
+SCRIPT_PATH="$(dirname "$(readlink -f "${0}")")"
+. "${SCRIPT_PATH}/lib/header"
+
+parse-parameters "${@}"
+set -- "${EXTRA_PARAMETERS[@]}"
+
+#------------------------------------------------------------------------------#
+
+# Get wallpaper.
+wallpaper="$(get-wallpaper)"
+wallpaper="$(printf "${wallpaper}" | head -n 1)"
+
+# Ask user for confirmation.
+whiptail --title "Removing the wallpaper" --yesno "Do you really want to delete the wallpaper \n${wallpaper}?" 0 0
+
+# If Yes, then 0 is returned, else 1.
+(( ${?} == 0 )) && rm --force "${wallpaper}"

@@ -1,0 +1,22 @@
+#!/bin/bash
+
+# Copyright (C) 2019-2021 Andrei Pavel, andrei.pavel@mail.com
+# Licensed under the MIT License
+
+# Header
+SCRIPT_PATH="$(dirname "$(readlink -f "${0}")")"
+. "${SCRIPT_PATH}/lib/header"
+
+parse-parameters "${@}"
+set -- "${EXTRA_PARAMETERS[@]}"
+
+#------------------------------------------------------------------------------#
+
+android_SDK='/opt/android-sdk'
+
+avd=$("${android_SDK}/emulator/emulator" -list-avds | head -n 1)
+if [[ -z "${avd}" ]]; then
+  avd='Pixel_3_API_R'
+fi
+cd /tmp
+nohup "${android_SDK}/emulator/emulator" -avd "${avd}" &> /dev/null &

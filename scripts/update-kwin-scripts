@@ -1,0 +1,61 @@
+#!/bin/bash
+
+# Copyright (C) 2019-2021 Andrei Pavel, andrei.pavel@mail.com
+# Licensed under the MIT License
+
+# Header
+SCRIPT_PATH="$(dirname "$(readlink -f "${0}")")"
+. "${SCRIPT_PATH}/lib/header"
+
+argument 'positional' 'branch' 'branch to attempt checkout on for each KWin script'
+
+parse-parameters "${@}"
+set -- "${EXTRA_PARAMETERS[@]}"
+
+#------------------------------------------------------------------------------#
+
+if ! command -V kpackagetool5 &> /dev/null; then
+  exit 0
+fi
+
+function git_clone() {
+  name=$(cut -d '/' -f 5 <<< "${git}" | cut -d '.' -f 1)
+  rm -rf "/tmp/${name}"
+  git clone "${git}" "/tmp/${name}"
+  if test -n "${branch+x}"; then
+    pushd "/tmp/${name}" > /dev/null
+    git checkout "${branch}" || true
+    popd > /dev/null
+  fi
+}
+
+rm -rf ~/.local/share/kwin/scripts/*
+
+for git in \
+  https://github.com/Jazqa/kwin-quarter-tiling.git \
+  https://github.com/kwin-scripts/kwin-tiling.git \
+  https://github.com/lingtjien/Grid-Tiling-Kwin.git \
+  https://github.com/lingtjien/Opacity-Control-KWin.git \
+; do
+  git_clone
+
+  # Install.
+  kpackagetool5 --type KWin/Script -i "/tmp/${name}"
+  mkdir -p "${HOME}/.local/share/kservices5"
+  cp "/tmp/${name}/metadata.desktop" "${HOME}/.local/share/kservices5/${name}.desktop"
+
+  rm -rf "/tmp/${name}"
+done
+
+for git in \
+  https://github.com/esjeon/krohnkite.git \
+; do
+  git_clone
+
+  # Install.
+  pushd "/tmp/${name}" > /dev/null
+  make install
+  popd > /dev/null
+
+  rm -rf "/tmp/${name}"
+done

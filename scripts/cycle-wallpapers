@@ -1,0 +1,25 @@
+#!/bin/bash
+
+# Copyright (C) 2017-2021 Andrei Pavel, andrei.pavel@mail.com
+# Licensed under the MIT License
+
+# Header
+SCRIPT_PATH="$(dirname "$(readlink -f "${0}")")"
+. "${SCRIPT_PATH}/lib/header"
+
+parse-parameters "${@}"
+set -- "${EXTRA_PARAMETERS[@]}"
+
+#------------------------------------------------------------------------------#
+
+wallpapers_path="$(readlink -f "${HOME}/wallpapers")"
+
+# timers=(1s 2s 4s 8s 16s 32s 60s 2m 4m 8m 16m 32m 1h 2h 4h 8h 16h 1d)
+timers=( 1d )
+while true; do
+  cycle-wallpaper -f
+  sleep "${timers[0]}"
+  if (( ${#timers[@]} >= 2 )); then
+    timers=("${timers[@]:1}")
+  fi
+done

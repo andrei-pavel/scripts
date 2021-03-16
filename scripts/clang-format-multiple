@@ -1,0 +1,22 @@
+#!/bin/bash
+
+# Copyright (C) 2017-2021 Andrei Pavel, andrei.pavel@mail.com
+# Licensed under the MIT License
+
+# Header
+SCRIPT_PATH="$(dirname "$(readlink -f "${0}")")"
+. "${SCRIPT_PATH}/lib/header"
+
+#------------------------------------------------------------------------------#
+
+dir="$(mktemp -d)"
+cp "${HOME}/.config/clang-format/.clang-format" "${dir}"
+while (( ${#} > 0 )); do
+  file="$(readlink -f "${1}")"
+  cp "${file}" "${dir}"
+  copied_file="${dir}/$(basename ${file})"
+  clang-format -style=file -i "${copied_file}"
+  mv "${copied_file}" "${file}"
+  shift
+done
+rm -rf "${dir}"

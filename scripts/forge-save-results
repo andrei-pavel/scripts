@@ -1,0 +1,24 @@
+#!/bin/bash
+
+# Copyright (C) 2021 Andrei Pavel, andrei.pavel@mail.com
+# Licensed under the MIT License
+
+# Header
+script_path="$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")"
+. "${script_path}/lib/header"
+
+parse-parameters "${@}"
+set -- "${EXTRA_PARAMETERS[@]}"
+
+#------------------------------------------------------------------------------#
+
+chown-to-me $(additional-options)
+timestamp=$(echo output-*.txt | head -n 1 | cut -d '-' -f 2- | cut -d '.' -f 1)
+if test -z "${timestamp}"; then
+  printf 'ERROR: no output-*.txt\n' >&2
+  exit 1
+fi
+
+destination="/etc/forge-results/${timestamp}"
+mkdir -p "${destination}"
+mv "output-${timestamp}.txt" "error-${timestamp}.txt" *"-aggregated-${timestamp}.xml" 'tests_results' "${destination}"

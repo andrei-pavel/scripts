@@ -1,0 +1,51 @@
+#!/bin/bash
+
+# Copyright (C) 2017-2021 Andrei Pavel, andrei.pavel@mail.com
+# Licensed under the MIT License
+
+# Header
+SCRIPT_PATH="$(dirname "$(readlink -f "${0}")")"
+. "${SCRIPT_PATH}/lib/header"
+. "${SCRIPT_PATH}/lib/utils"
+
+parse-parameters "${@}"
+set -- "${EXTRA_PARAMETERS[@]}"
+
+#------------------------------------------------------------------------------#
+
+# Choose what directories to pull.
+directories="${HOME}"
+if (( EUID == 0 )); then
+  directories+=' /'
+fi
+
+# Pull.
+for dir in ${directories}; do
+  pushd "${dir}" > /dev/null
+  {
+    if ! test -d .git; then
+      if test "${dir}" = '/'; then
+        repo='ROOT'
+      else
+        repo='HOME'
+      fi
+      git init
+      git remote add origin "https://gitlab.com/andrei-pavel/${repo}.git"
+      git remote update
+      git checkout -b master -f -t origin/master
+      git remote set-url origin "git@gitlab.com:andrei-pavel/${repo}.git"
+      chmod 0600 ~/.ssh/*
+      mkdir -p ~/.ssh/sockets
+      chmod 0700 ~/.ssh/sockets
+    fi
+    git pull
+    git remote prune origin
+    git submodule update --init --recursive
+  }
+  popd > /dev/null
+done
+
+# Also run as root.
+if (( EUID != 0 )); then
+  exec sudo su -m root -c "${0} ${@} $(additional-options)"
+fi

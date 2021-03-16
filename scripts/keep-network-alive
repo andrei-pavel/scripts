@@ -1,0 +1,25 @@
+#!/bin/bash
+
+# Copyright (C) 2017-2021 Andrei Pavel, andrei.pavel@mail.com
+# Licensed under the MIT License
+
+# Header
+SCRIPT_PATH="$(dirname "$(readlink -f "${0}")")"
+. "${SCRIPT_PATH}/lib/header"
+
+parse-parameters "${@}"
+set -- "${EXTRA_PARAMETERS[@]}"
+
+#------------------------------------------------------------------------------#
+
+while true; do
+  ping -c 1 google.com || true
+  result="${PIPESTATUS[0]}"
+  if (( result == 0 )); then
+    printf 'All good. Network is up.'
+  else
+    printf 'Restarting network-manager...'
+    systemctl restart network-manager
+  fi
+  sleep 10s
+done

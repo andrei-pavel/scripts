@@ -1,0 +1,21 @@
+#!/bin/bash
+
+# Copyright (C) 2017-2021 Andrei Pavel, andrei.pavel@mail.com
+# Licensed under the MIT License
+
+# Header
+SCRIPT_PATH="$(dirname "$(readlink -f "${0}")")"
+. "${SCRIPT_PATH}/lib/header"
+
+parse-parameters "${@}"
+set -- "${EXTRA_PARAMETERS[@]}"
+
+#------------------------------------------------------------------------------#
+
+mkdir -p ~/.config/templates/thunderbird
+find ~/.thunderbird -type d -name '*.default' | xargs -I{} bash -c '
+  cp {}/prefs.js ~/.config/templates/thunderbird/prefs.js;
+  if ! jq . {}/session.json > ~/.config/templates/thunderbird/session.json; then
+    cp {}/session.json ~/.config/templates/thunderbird/session.json;
+  fi
+'

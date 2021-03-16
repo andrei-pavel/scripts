@@ -1,0 +1,21 @@
+#!/bin/bash
+
+# Copyright (C) 2017-2021 Andrei Pavel, andrei.pavel@mail.com
+# Licensed under the MIT License
+
+# Header
+SCRIPT_PATH="$(dirname "$(readlink -f "${0}")")"
+. "${SCRIPT_PATH}/lib/header"
+
+parse-parameters "${@}"
+set -- "${EXTRA_PARAMETERS[@]}"
+
+#------------------------------------------------------------------------------#
+
+server=${1}
+from=${2}
+to=${3-${from}}
+
+if ssh "${server}" 'exit' 2> /dev/null; then
+  rsync-synchronize "${from}" "${server}:${to}"
+fi

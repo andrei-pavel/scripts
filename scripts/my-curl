@@ -1,0 +1,27 @@
+#!/bin/bash
+
+# Copyright (C) 2017-2021 Andrei Pavel, andrei.pavel@mail.com
+# Licensed under the MIT License
+
+# Header
+SCRIPT_PATH="$(dirname "$(readlink -f "${0}")")"
+. "${SCRIPT_PATH}/lib/header"
+. "${SCRIPT_PATH}/lib/utils"
+
+argument 'positional' 'method' 'method'
+argument 'positional' 'url' 'url'
+argument 'positional' 'json' 'json'
+
+parse-parameters "${@}"
+set -- "${EXTRA_PARAMETERS[@]}"
+
+mandatory method
+mandatory url
+
+#------------------------------------------------------------------------------#
+
+if test -z "${json+x}"; then
+  curl -X "${method}" "${url}"
+else
+  curl -X "${method}" "${url}" -H 'Content-Type: application/json' -d "${json}"
+fi

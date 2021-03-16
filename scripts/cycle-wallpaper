@@ -1,0 +1,39 @@
+#!/bin/bash
+
+# Copyright (C) 2017-2021 Andrei Pavel, andrei.pavel@mail.com
+# Licensed under the MIT License
+
+# Header
+SCRIPT_PATH="$(dirname "$(readlink -f "${0}")")"
+. "${SCRIPT_PATH}/lib/header"
+
+argument 'simple' 'forced' '-f|--force' 'cycle even if day has not passed'
+
+parse-parameters "${@}"
+set -- "${EXTRA_PARAMETERS[@]}"
+
+# Default parameters
+test -z "${forced+x}" && forced=false
+
+#------------------------------------------------------------------------------#
+
+# Has day passed?
+today="$(date --rfc-3339="date")"
+wallpaper="$(get-wallpaper)"
+if [[ -f "${wallpaper}" ]]; then
+  wallpaper="$(printf "${wallpaper}" | head -n 1)"
+  last_changed="$(stat "${wallpaper}" | grep 'Change' | cut -d ' ' -f 2)"
+else
+  last_changed='never'
+fi
+
+# Check & set.
+if ${forced} || [[ "${today}" != "${last_changed}" ]]; then
+  wallpapers_path="$(readlink -f "${HOME}/wallpapers")"
+
+  wallpapers="$(find "${wallpapers_path}" -type f | grep -Ev "/\." | sort -V)"
+  wallpaper_count="$(printf '%s\n' "${wallpapers}" | wc -l)"
+  random="$((RANDOM % wallpaper_count + 1))"
+  wallpaper="$(printf '%s' "${wallpapers}" | head -n "${random}" | tail -n 1)"
+  set-wallpaper "${wallpaper}"
+fi

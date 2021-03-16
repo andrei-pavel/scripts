@@ -1,0 +1,37 @@
+#!/bin/bash
+
+# Copyright (C) 2017-2021 Andrei Pavel, andrei.pavel@mail.com
+# Licensed under the MIT License
+
+# Header
+SCRIPT_PATH="$(dirname "$(readlink -f "${0}")")"
+. "${SCRIPT_PATH}/lib/header"
+
+argument 'positional' 'tag' 'branch'
+argument 'positional' 'remote' 'remote'
+
+parse-parameters "${@}"
+set -- "${EXTRA_PARAMETERS[@]}"
+
+mandatory tag
+
+# Default parameters
+test -z "${remote+x}" && remote='origin'
+
+#------------------------------------------------------------------------------#
+
+# If tag exists...
+if test -n "$(git tag -l "${tag}")"; then
+  # If we are not on tag...
+  if test "$(git tag --points-at HEAD | grep -Fc "${tag}")" = 0; then
+    # Remove tag
+    git tag -d "${tag}"
+    git push "${remote}" --delete "${tag}" 2> /dev/null || true
+
+    # Apply tag.
+    git tag "${tag}"
+  fi
+else
+  # Apply tag.
+  git tag "${tag}"
+fi

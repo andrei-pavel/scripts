@@ -1,0 +1,17 @@
+#!/bin/bash
+
+# Copyright (C) 2019-2021 Andrei Pavel, andrei.pavel@mail.com
+# Licensed under the MIT License
+
+# Header
+SCRIPT_PATH="$(dirname "$(readlink -f "${0}")")"
+. "${SCRIPT_PATH}/lib/header"
+
+#------------------------------------------------------------------------------#
+
+for file in $(find "${1-.}" -type f -name '*.json'); do
+  temporary="/tmp/jq-all/${file}"
+  mkdir -p "$(dirname "${temporary}")"
+  jq . < "${file}" > "${temporary}"
+  mv "${temporary}" "${file}"
+done

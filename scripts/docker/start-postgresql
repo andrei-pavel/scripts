@@ -1,0 +1,57 @@
+#!/bin/bash
+
+# Copyright (C) 2017-2021 Andrei Pavel, andrei.pavel@mail.com
+# Licensed under the MIT License
+
+# Header
+script_path="$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")"
+. "${script_path}/lib/header"
+. "${script_path}/lib/traps"
+. "${script_path}/lib/utils"
+
+(( EUID != 0 )) && exec sudo -- "${0}" "${@}" $(additional-options)
+
+argument 'simple' 'empty_superuser_password' '-e|--empty' 'use no password for the superuser'
+
+parse-parameters "${@}"
+set -- "${EXTRA_PARAMETERS[@]}"
+
+#------------------------------------------------------------------------------#
+
+id=$(docker ps -a -f 'name=postgresql' | tail -n -1 | cut -d ' ' -f 1 | grep -Fv 'CONTAINER' || true)
+
+if test -z "${id}"; then
+  directory="$(mktemp -d)"
+  traps "rm -rf ${directory}"
+  mkdir -p /var/lib/postgresql/data
+  mkdir -p /var/run/postgresql
+  if test ! -e /var/run/postgresql/.s.PGSQL.5432 && test ! -L /var/run/postgresql/.s.PGSQL.5432; then
+    ln -s /var/lib/postgresql/data/ /var/run/postgresql/.s.PGSQL.5432
+  fi
+  docker run -d -e 'POSTGRES_PASSWORD=keatest' \
+    --name 'postgresql' -p '5432:5432' --rm \
+    -v "${directory}:/var/lib/postgresql/data" \
+    -v '/var/run/postgresql:/var/run/postgresql' \
+    "${@}" 'postgres'
+  printf 'Container directory mapped to %s\n' "${directory}"
+  traps
+else
+  docker start 'postgresql'
+fi
+
+# Wait to start.
+"${script_path}/wait-for-postgresql" $(additional-parameters) $(additional-options)
+
+# Create database and users.
+postgresql-create-database-and-users $(additional-parameters) $(additional-options)
+
+# Set time zone.
+timezone=$(get-timezone)
+statement=$(printf 'ALTER DATABASE keatest SET TIMEZONE="%s";' "${timezone}")
+if "${empty_superuser_password-false}"; then
+  unset PGPASSWORD
+else
+  export PGPASSWORD=keatest
+fi
+printf '%s' "${statement}" | psql --set ON_ERROR_STOP=1 -A -t -q -U 'postgres'
+unset PGPASSWORD

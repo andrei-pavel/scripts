@@ -1,0 +1,33 @@
+#!/bin/bash
+
+# Copyright (C) 2017-2021 Andrei Pavel, andrei.pavel@mail.com
+# Licensed under the MIT License
+
+# Get script path and append it to PATH so other scripts are callable.
+SCRIPT_PATH="$(dirname "$(readlink -f "${0}")")"
+PATH="${PATH}:${SCRIPT_PATH}"
+
+# Header
+. "${SCRIPT_PATH}/lib/header"
+. "${SCRIPT_PATH}/lib/spinner"
+
+parse-parameters "${@}"
+set -- "${EXTRA_PARAMETERS[@]}"
+
+#------------------------------------------------------------------------------#
+
+disable-spinners
+
+"${SCRIPT_PATH}/bash-boilerplate/install" $(additional-options)
+
+start-spinner "Installing..."
+
+for i in '' 'docker' 'podman'; do
+  mkdir -p "/usr/local/bin/${i}"
+  if test ! -e "/usr/local/bin/${i}/lib"; then
+    cp -av "${SCRIPT_PATH}/scripts/${i}/lib"  "/usr/local/bin/${i}/lib"
+  fi
+  find "${SCRIPT_PATH}/scripts/${i}" -mindepth 1 -maxdepth 1 -type f -exec basename {} \; | xargs -I{} bash -c "install -Dm755 '${SCRIPT_PATH}/scripts/${i}/{}' '/usr/local/bin/${i}/{}'"
+done
+
+stop-spinner ${?}

@@ -1,0 +1,33 @@
+#!/bin/bash
+
+# Copyright (C) 2017-2021 Andrei Pavel, andrei.pavel@mail.com
+# Licensed under the MIT License
+
+# Header
+SCRIPT_PATH="$(dirname "$(readlink -f "${0}")")"
+. "${SCRIPT_PATH}/lib/header"
+
+parse-parameters "${@}"
+set -- "${EXTRA_PARAMETERS[@]}"
+
+#------------------------------------------------------------------------------#
+
+music_directory="/opt/mpd/music"
+playlists_directory="/opt/mpd/playlists"
+genres="ost lounge pop rock"
+
+regexp=
+for genre in ${genres}; do
+  regexp+="/${genre}|"
+done
+if [[ ! -z "${regexp+x}" ]]; then
+  regexp="${regexp:0:-1}"
+fi
+
+set -x
+pushd "${music_directory}" > /dev/null
+{
+  find "${music_directory}/" -maxdepth 2 -type d | grep -E "${regexp}" | xargs -I{} find {} -type f > "${playlists_directory}/default.m3u"
+}
+popd > /dev/null
+set +x

@@ -1,0 +1,32 @@
+#!/bin/bash
+
+# Copyright (C) 2019-2021 Andrei Pavel, andrei.pavel@mail.com
+# Licensed under the MIT License
+
+# Header
+SCRIPT_PATH="$(dirname "$(readlink -f "${0}")")"
+. "${SCRIPT_PATH}/lib/header"
+
+parse-parameters "${@}"
+set -- "${EXTRA_PARAMETERS[@]}"
+
+#------------------------------------------------------------------------------#
+
+for git in \
+  https://github.com/andrei-pavel/sddm-theme-clairvoyance   \
+; do
+  name=$(cut -d '/' -f 5 <<< "${git}" | cut -d '.' -f 1)
+  rm -rf "/tmp/${name}"
+  git clone "${git}" "/tmp/${name}"
+  if [[ -n "${1+x}" ]]; then
+    pushd "/tmp/${name}" > /dev/null
+    git checkout "${1}"
+    popd > /dev/null
+  fi
+  if ! mkdir -p /usr/share/sddm/themes/sddm-theme-clairvoyance &> /dev/null; then
+    sudo mkdir -p /usr/share/sddm/themes
+    chown-to-me $(additional-options) /usr/share/sddm/themes
+  fi
+  rsync --verbose --progress --human-readable --compress --archive --hard-links --one-file-system --acls --xattrs --update "/tmp/${name}/" "/usr/share/sddm/themes/${name}/"
+  rm -rf "/tmp/${name}"
+done

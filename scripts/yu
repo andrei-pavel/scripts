@@ -1,0 +1,29 @@
+#!/bin/bash
+
+# Copyright (C) 2017-2021 Andrei Pavel, andrei.pavel@mail.com
+# Licensed under the MIT License
+
+# Header
+SCRIPT_PATH="$(dirname "$(readlink -f "${0}")")"
+. "${SCRIPT_PATH}/lib/header"
+
+allow-extra-parameters
+
+parse-parameters "${@}"
+set -- "${EXTRA_PARAMETERS[@]}"
+
+#------------------------------------------------------------------------------#
+
+if command -V yay &> /dev/null; then
+  yay -Syyuu --needed --noconfirm --overwrite '*' "${@}"
+  yay -c --noconfirm
+  yay -Sc --noconfirm --overwrite '*'
+elif command -V dnf &> /dev/null; then
+  (( EUID != 0 )) && exec sudo -- "${0}" "${@}" $(additional-options)
+  dnf upgrade -y
+elif command -V apt &> /dev/null; then
+  (( EUID != 0 )) && exec sudo -- "${0}" "${@}" $(additional-options)
+  apt-get update
+  apt-get dist-upgrade -y
+  apt-get autoremove -y
+fi

@@ -1,0 +1,124 @@
+#!/bin/bash
+
+# Copyright (C) 2017-2021 Andrei Pavel, andrei.pavel@mail.com
+# Licensed under the MIT License
+
+# Header
+script_path="$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")"
+. "${script_path}/lib/header"
+
+argument 'simple' 'show_only' '-s|--show-only' 'only show command'
+
+allow-extra-parameters
+
+parse-parameters "${@}"
+set -- "${EXTRA_PARAMETERS[@]}"
+
+# Default arguments
+test -z "${show_only+x}" && show_only=false
+
+if ${show_only}; then
+  e='echo'
+else
+  e=
+fi
+
+#------------------------------------------------------------------------------#
+
+toplevel="$(git rev-parse --show-toplevel)"
+
+# Customizable paths
+benchmark_sources="${HOME}/work/third-party/benchmark"
+cassandra_config_defines="${toplevel}/tools/cql_config_defines.sh"
+cassandra_driver='/opt/cpp-driver'
+cassandra_driver_source="${HOME}/work/third-party/cpp-driver"
+libyang_source="${HOME}/work/third-party/libyang"
+libyang_path="/opt/libyang"
+prefix='/opt/kea'
+sysrepo_config="${toplevel}/tools/sysrepo_config"
+sysrepo_config_defines="${toplevel}/tools/sysrepo_config_defines.sh"
+sysrepo_path="/opt/sysrepo"
+sysrepo_source="${HOME}/work/third-party/sysrepo"
+
+pushd "${toplevel}" > /dev/null
+
+cp "${cassandra_config_defines}.sample" "${cassandra_config_defines}"
+sed -i.tmp "
+  s#CPP_DRIVER_PATH=.*#CPP_DRIVER_PATH='${cassandra_driver_source}'#g
+" "${cassandra_config_defines}"
+cassandra_driver="${toplevel}/tools/cql_config"
+
+cp "${sysrepo_config_defines}.sample" "${sysrepo_config_defines}"
+sed -i.tmp "
+  s#LIBYANG_PATH=.*#LIBYANG_PATH='${libyang_source}'#g;
+  s#SYSREPO_PATH=.*#SYSREPO_PATH='${sysrepo_source}'#g;
+" "${sysrepo_config_defines}"
+
+# kea-premium
+if test -d ../kea-premium && test ! -d ./premium; then
+  ${e} cp -rf ../kea-premium ./premium
+fi
+
+# ./configure
+if test ! -f ./configure; then
+  ${e} autoreconf -f -i
+fi
+
+# Is googletest installed?
+for i in \
+  /usr/lib/libgtest.a \
+  /usr/lib/libgtest.so \
+  /usr/local/lib/libgtest.a \
+  /usr/local/lib/libgtest.so \
+; do
+  if test -f "${i}"; then
+    with_gtest='--with-gtest'
+    break
+  fi
+done
+if test -z "${with_gtest+x}"; then
+  with_gtest="--with-gtest-source=$(cd ../googletest && pwd)"
+fi
+
+# Is cassandra installed?
+if pkg-config cassandra &> /dev/null; then
+  with_cql='--with-cql'
+else
+  with_cql=
+fi
+
+if test ! -f ./Makefile; then
+  export CXXFLAGS
+  CXXFLAGS+=' -g3 -ggdb -O0 -U_FORTIFY_SOURCE'
+  CXXFLAGS+=' -Wall -Wextra'
+  if test -n "${TSAN+x}" && test "${TSAN}" = true; then
+    CXXFLAGS+=' -fsanitize=thread'
+    export TSAN_OPTIONS='second_deadlock_stack=1'
+  fi
+  CXXFLAGS=$(printf '%s' "${CXXFLAGS}" | xargs)
+  if test -n "${e+x}"; then
+    ${e} export CXXFLAGS="${CXXFLAGS}"
+    if test -n "${TSAN_OPTIONS+x}"; then
+      ${e} export TSAN_OPTIONS="${TSAN_OPTIONS}"
+    fi
+  fi
+  ${e} ./configure                              \
+    --enable-debug                              \
+    --enable-generate-docs                      \
+    --enable-generate-messages                  \
+    --enable-generate-parser                    \
+    --enable-logger-checks                      \
+    --enable-perfdhcp                           \
+    --enable-shell                              \
+    --prefix="${prefix}"                        \
+    ${with_cql}                                 \
+    --with-freeradius='/opt/freeradius-client'  \
+    ${with_gtest}                               \
+    --with-mysql                                \
+    --with-pgsql                                \
+    "${@}"
+fi
+
+rm "${cassandra_config_defines}" "${sysrepo_config_defines}"
+
+popd > /dev/null

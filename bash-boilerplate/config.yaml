@@ -1,0 +1,6 @@
+this: works!
+data:
+  this: also works!
+list:
+  - element1
+  - element2

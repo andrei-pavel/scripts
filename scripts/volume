@@ -1,0 +1,28 @@
+#!/bin/bash
+
+# Copyright (C) 2017-2021 Andrei Pavel, andrei.pavel@mail.com
+# Licensed under the MIT License
+
+# Header
+SCRIPT_PATH="$(dirname "$(readlink -f "${0}")")"
+. "${SCRIPT_PATH}/lib/header"
+
+parse-parameters "${@}"
+set -- "${EXTRA_PARAMETERS[@]}"
+
+#------------------------------------------------------------------------------#
+
+if command -v pulsemixer 2>&1 > /dev/null; then
+  pulsemixer
+else
+  cards="$(aplay -l | grep card | cut -d ' ' -f 2 | cut -d ':' -f 1 | xargs)"
+
+  max=0
+  for card in ${cards}; do
+    if (( max < card )); then
+      max="${card}"
+    fi
+  done
+
+  alsamixer --card="${max}"
+fi

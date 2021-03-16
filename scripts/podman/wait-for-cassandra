@@ -1,0 +1,22 @@
+#!/bin/bash
+
+# Copyright (C) 2017-2021 Andrei Pavel, andrei.pavel@mail.com
+# Licensed under the MIT License
+
+# Header
+script_path="$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")"
+. "${script_path}/lib/header"
+
+parse-parameters "${@}"
+set -- "${EXTRA_PARAMETERS[@]}"
+
+#------------------------------------------------------------------------------#
+
+cql_version=
+while ! output=$(cqlsh ${cql_version} -e 'quit' 2>&1); do
+  if grep 'not supported' <<<"${output}" &> /dev/null; then
+    cql_version=$(sed 's/.*Supported versions: \[u\(.*\)\]",)})/\1/' <<<"${output}" | sed "s/'\(.*\)'/\1/")
+    cql_version="--cqlversion=${cql_version}"
+  fi
+  sleep 1
+done

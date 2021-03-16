@@ -1,0 +1,14 @@
+#!/bin/bash
+
+# Copyright (C) 2017-2021 Andrei Pavel, andrei.pavel@mail.com
+# Licensed under the MIT License
+
+# Header
+SCRIPT_PATH="$(dirname "$(readlink -f "${0}")")"
+. "${SCRIPT_PATH}/lib/header"
+
+#------------------------------------------------------------------------------#
+
+mac="$(sed 's/[:-]//g' <<< "${@}")"
+
+grep -i "${mac:0:5}" '/usr/share/ieee-data/oui.txt'

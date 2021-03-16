@@ -1,0 +1,27 @@
+#!/bin/bash
+
+# Copyright (C) 2017-2021 Andrei Pavel, andrei.pavel@mail.com
+# Licensed under the MIT License
+
+# Header
+SCRIPT_PATH="$(dirname "$(readlink -f "${0}")")"
+. "${SCRIPT_PATH}/lib/header"
+
+argument 'simple' 'lookup' '-l|--lookup' 'lookup only'
+
+parse-parameters "${@}"
+set -- "${EXTRA_PARAMETERS[@]}"
+
+test -z "${lookup+x}" && lookup=false
+
+#------------------------------------------------------------------------------#
+
+if ! ${lookup}; then
+  nohup ngrok "${@}" 2>&1 > /dev/null &
+fi
+result=
+while [[ -z ${result} ]]; do
+  result="$(curl localhost:4040/api/tunnels 2> /dev/null)"
+done
+
+jq -r '.tunnels[].public_url' <<< "${result}"

@@ -1,0 +1,19 @@
+#!/bin/bash
+
+# Copyright (C) 2017-2021 Andrei Pavel, andrei.pavel@mail.com
+# Licensed under the MIT License
+
+# Header
+SCRIPT_PATH="$(dirname "$(readlink -f "${0}")")"
+. "${SCRIPT_PATH}/lib/header"
+
+parse-parameters "${@}"
+set -- "${EXTRA_PARAMETERS[@]}"
+
+#------------------------------------------------------------------------------#
+
+diff="$(git diff --name-only | grep -E '\.cc$')"
+staged_diff="$(git diff --staged --name-only | grep -E '\.cc$')"
+
+[[ ! -z ${diff} ]] && printf '%s' "${diff}" | xargs cpplint
+[[ ! -z ${staged_diff} ]] && printf '%s' "${staged_diff}" | xargs cpplint

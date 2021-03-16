@@ -1,0 +1,30 @@
+#!/bin/bash
+
+# Copyright (C) 2019-2021 Andrei Pavel, andrei.pavel@mail.com
+# Licensed under the MIT License
+
+# Header
+SCRIPT_PATH="$(dirname "$(readlink -f "${0}")")"
+. "${SCRIPT_PATH}/lib/header"
+
+argument 'positional' 'divisor' 'the number to divide by'
+
+parse-parameters "${@}"
+set -- "${EXTRA_PARAMETERS[@]}"
+
+#------------------------------------------------------------------------------#
+
+f='/tmp/i'
+if test ! -f "${f}"; then
+  printf '1' > "${f}"
+fi
+
+flock "${f}" -c "
+  i=\$(cat ${f});
+  printf '%d' \$(( i + 1 )) > ${f};
+  if test -z \"${divisor+x}\"; then
+    printf \"\${i}\\\\n\";
+  else
+    printf \"\$(( (i % ${divisor-0}) + 1 ))\\\\n\";
+  fi
+"

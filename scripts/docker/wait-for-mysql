@@ -1,0 +1,25 @@
+#!/bin/bash
+
+# Copyright (C) 2017-2021 Andrei Pavel, andrei.pavel@mail.com
+# Licensed under the MIT License
+
+# Header
+script_path="$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")"
+. "${script_path}/lib/header"
+
+argument 'simple' 'empty_superuser_password' '-e|--empty' 'use no password for the superuser'
+
+parse-parameters "${@}"
+set -- "${EXTRA_PARAMETERS[@]}"
+
+#------------------------------------------------------------------------------#
+
+if "${empty_superuser_password-false}"; then
+  password_parameters=()
+else
+  password_parameters=( --password='keatest' )
+fi
+
+while ! mysql -h 127.0.0.1 -u root "${password_parameters[@]}" -e 'quit'; do
+  sleep 1
+done

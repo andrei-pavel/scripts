@@ -1,0 +1,20 @@
+#!/bin/bash
+
+# Copyright (C) 2017-2021 Andrei Pavel, andrei.pavel@mail.com
+# Licensed under the MIT License
+
+# Header
+SCRIPT_PATH="$(dirname "$(readlink -f "${0}")")"
+. "${SCRIPT_PATH}/lib/header"
+
+#------------------------------------------------------------------------------#
+
+for d in $(find . -name '.git' | sort -uV); do
+  repository=$(dirname "${d}")
+  pushd "${repository}" > /dev/null
+  {
+    printf '========> %s\n' "${repository}"
+    git ${@} || true
+  }
+  popd > /dev/null
+done

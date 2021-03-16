@@ -1,0 +1,35 @@
+#!/bin/bash
+
+# Copyright (C) 2020-2021 Andrei Pavel, andrei.pavel@mail.com
+# Licensed under the MIT License
+
+# Header
+SCRIPT_PATH="$(dirname "$(readlink -f "${0}")")"
+. "${SCRIPT_PATH}/lib/header"
+
+parse-parameters "${@}"
+set -- "${EXTRA_PARAMETERS[@]}"
+
+#------------------------------------------------------------------------------#
+
+ifs_saved="${IFS}"
+export IFS=$'\n'
+if (( EUID == 0 )); then
+  updatedb
+else
+  sudo updatedb
+fi
+locate lib64 | grep -E 'lib64$' | xargs -I{} bash -c '
+pushd $(dirname "{}") > /dev/null
+if [[ -e ./lib ]]; then
+  if [[ -f ./lib/.gitkeep ]] && (( $(find ./lib -type f | wc -l) == 1 )); then
+    rm -rf ./lib
+  fi
+fi
+if [[ ! -e ./lib ]]; then
+  ln -s ./lib64 ./lib
+  echo "$(dirname "{}")/lib"
+fi
+popd > /dev/null
+'
+export IFS="${ifs_saved}"

@@ -1,0 +1,16 @@
+#!/bin/bash
+
+# Copyright (C) 2019-2021 Andrei Pavel, andrei.pavel@mail.com
+# Licensed under the MIT License
+
+# Header
+SCRIPT_PATH="$(dirname "$(readlink -f "${0}")")"
+. "${SCRIPT_PATH}/lib/header"
+
+parse-parameters "${@}"
+set -- "${EXTRA_PARAMETERS[@]}"
+
+#------------------------------------------------------------------------------#
+
+sort -V < ~/.netopeer2-cli/history | uniq > /tmp/netopeer2-cli-history
+mv /tmp/netopeer2-cli-history ~/.netopeer2-cli/history

@@ -1,0 +1,21 @@
+#!/bin/bash
+
+# Copyright (C) 2020-2021 Andrei Pavel, andrei.pavel@mail.com
+# Licensed under the MIT License
+
+# Header
+SCRIPT_PATH="$(dirname "$(readlink -f "${0}")")"
+. "${SCRIPT_PATH}/lib/header"
+
+#------------------------------------------------------------------------------#
+
+files=$(find . -type f -name "${1}")
+if (( $(wc -l <<<"${files}") == 1 )); then
+  if [[ -z "${files}" ]]; then
+    printf -- '-\n'
+  else
+    vim ${files}
+  fi
+else
+  printf '%s\n' "${files}"
+fi

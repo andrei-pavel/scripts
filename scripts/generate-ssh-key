@@ -1,0 +1,24 @@
+#!/bin/bash
+
+# Copyright (C) 2017-2021 Andrei Pavel, andrei.pavel@mail.com
+# Licensed under the MIT License
+
+# Header
+SCRIPT_PATH="$(dirname "$(readlink -f "${0}")")"
+. "${SCRIPT_PATH}/lib/header"
+
+argument 'simple' 'rsa' '-r|--rsa' 'generate key compatible with OpenSSH older than v6.5'
+
+parse-parameters "${@}"
+set -- "${EXTRA_PARAMETERS[@]}"
+
+# Default parameters
+test -z "${rsa+x}" && rsa=false
+
+#------------------------------------------------------------------------------#
+
+if "${rsa}"; then
+  ssh-keygen -t rsa -b 4096 -o -a 100
+else
+  ssh-keygen -t ed25519 -a 100
+fi
